@@ -8,23 +8,71 @@ module CSVImporter
   # * It provides a human readable message
   #
   class Report
-    include Virtus.model
+    extend T::Sig
+    # include Virtus.model
 
-    attribute :status, Symbol, default: proc { :pending }
+    sig { returns(Symbol) }
+    attr_accessor :status
 
-    attribute :missing_columns, Array[String], default: proc { [] }
-    attribute :extra_columns, Array[String], default: proc { [] }
+    sig { returns(T::Array[String]) }
+    attr_accessor :missing_columns
 
-    attribute :parser_error, String
+    sig { returns(T::Array[String]) }
+    attr_accessor :extra_columns
 
-    attribute :created_rows, Array[Row], default: proc { [] }
-    attribute :updated_rows, Array[Row], default: proc { [] }
-    attribute :failed_to_create_rows, Array[Row], default: proc { [] }
-    attribute :failed_to_update_rows, Array[Row], default: proc { [] }
-    attribute :create_skipped_rows, Array[Row], default: proc { [] }
-    attribute :update_skipped_rows, Array[Row], default: proc { [] }
+    sig { returns(String) }
+    attr_accessor :parser_error
 
-    attribute :message_generator, Class, default: proc { ReportMessage }
+    sig { returns(T::Array[Row]) }
+    attr_accessor :created_rows
+
+    sig { returns(T::Array[Row]) }
+    attr_accessor :updated_rows
+
+    sig { returns(T::Array[Row]) }
+    attr_accessor :failed_to_create_rows
+
+    sig { returns(T::Array[Row]) }
+    attr_accessor :failed_to_update_rows
+
+    sig { returns(T::Array[Row]) }
+    attr_accessor :create_skipped_rows
+
+    sig { returns(T::Array[Row]) }
+    attr_accessor :update_skipped_rows
+
+    sig { returns(Class) }
+    attr_accessor :message_generator
+
+    def initialize
+      @status = :pending
+      @missing_columns = []
+      @extra_columns = []
+      @parser_error = nil
+      @created_rows = []
+      @updated_rows = []
+      @failed_to_create_rows = []
+      @failed_to_update_rows = []
+      @create_skipped_rows = []
+      @update_skipped_rows = []
+      @message_generator = ReportMessage
+    end
+
+    # attribute :status, Symbol, default: proc { :pending }
+
+    # attribute :missing_columns, Array[String], default: proc { [] }
+    # attribute :extra_columns, Array[String], default: proc { [] }
+
+    # attribute :parser_error, String
+
+    # attribute :created_rows, Array[Row], default: proc { [] }
+    # attribute :updated_rows, Array[Row], default: proc { [] }
+    # attribute :failed_to_create_rows, Array[Row], default: proc { [] }
+    # attribute :failed_to_update_rows, Array[Row], default: proc { [] }
+    # attribute :create_skipped_rows, Array[Row], default: proc { [] }
+    # attribute :update_skipped_rows, Array[Row], default: proc { [] }
+
+    # attribute :message_generator, Class, default: proc { ReportMessage }
 
     def valid_rows
       created_rows + updated_rows

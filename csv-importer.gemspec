@@ -18,12 +18,17 @@ Gem::Specification.new do |spec|
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "virtus"
+  spec.add_dependency "sorbet-runtime"
+  spec.add_dependency "csv"
 
-  spec.add_development_dependency "rspec", "~> 3.3.0"
+  spec.add_development_dependency "rspec", "~> 3.12.0"
   spec.add_development_dependency "rake"
-  spec.add_development_dependency "guard-rspec"
-  spec.add_development_dependency "activemodel", "~> 5"
+  # spec.add_development_dependency "guard-rspec"
+  spec.add_development_dependency "activemodel", "~> 8"
   spec.add_development_dependency "simplecov"
   spec.add_development_dependency "codeclimate-test-reporter"
+  spec.add_development_dependency "sorbet"
+  spec.add_development_dependency "tapioca"
+  spec.add_development_dependency "spoom"
+  spec.add_development_dependency "rubocop"
 end

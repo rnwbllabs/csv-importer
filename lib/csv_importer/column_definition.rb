@@ -24,12 +24,29 @@ module CSVImporter
   #   end
   #
   class ColumnDefinition
-    include Virtus.model
+    extend T::Sig
+    # include Virtus.model
 
-    attribute :name, Symbol
-    attribute :to # Symbol or Proc
-    attribute :as # Symbol, String, Regexp, Array
-    attribute :required, Virtus::Attribute::Boolean
+    sig { returns(T.nilable(Symbol)) }
+    attr_accessor :name
+
+    sig { returns(T.nilable(T.any(Symbol, T.untyped))) }
+    attr_accessor :to
+
+    # sig { returns(T.nilable(T.any(Symbol, String, Regexp, Array))) }
+    sig { returns(T.untyped) }
+    attr_accessor :as
+
+    def initialize(name: nil, to: nil, as: nil)
+      @name = name
+      @to = to
+      @as = as
+    end
+
+    # attribute :name, Symbol
+    # attribute :to # Symbol or Proc
+    # attribute :as # Symbol, String, Regexp, Array
+    # attribute :required, Virtus::Attribute::Boolean
 
     # The model attribute that this column targets
     def attribute
@@ -41,7 +58,7 @@ module CSVImporter
     end
 
     # Return true if column definition matches the column name passed in.
-    def match?(column_name, search_query=(as || name))
+    def match?(column_name, search_query = (as || name))
       return false if column_name.nil?
 
       downcased_column_name = column_name.downcase

@@ -2,10 +2,23 @@ module CSVImporter
 
   # The CSV Header
   class Header
-    include Virtus.model
+    # include Virtus.model
 
-    attribute :column_definitions, Array[ColumnDefinition]
-    attribute :column_names, Array[String]
+    extend T::Sig
+
+    sig { returns(T::Array[ColumnDefinition]) }
+    attr_accessor :column_definitions
+
+    sig { returns(T::Array[String]) }
+    attr_accessor :column_names
+
+    def initialize(column_definitions: [], column_names: [])
+      @column_definitions = column_definitions
+      @column_names = column_names
+    end
+
+    # attribute :column_definitions, Array[ColumnDefinition]
+    # attribute :column_names, Array[String]
 
     def columns
       column_names.map do |column_name|

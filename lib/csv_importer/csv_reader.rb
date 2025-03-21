@@ -1,14 +1,43 @@
+# frozen_string_literal: true
+
 module CSVImporter
 
   # Reads, sanitize and parse a CSV file
   class CSVReader
-    include Virtus.model
+    extend T::Sig
+    # include Virtus.model
 
-    attribute :content, String
-    attribute :file # IO
-    attribute :path, String
-    attribute :quote_char, String, default: '"'
-    attribute :encoding, String, default: 'UTF-8:UTF-8'
+
+    # sig { returns(String) }
+    sig { returns(T.untyped) }
+    attr_accessor :content
+
+    sig { returns(T.untyped) }
+    attr_accessor :file
+
+    sig { returns(String) }
+    attr_accessor :path
+
+    sig { returns(String) }
+    attr_accessor :quote_char
+
+    sig { returns(String) }
+    attr_accessor :encoding
+
+    # def initialize(content = nil, file = nil, path = nil, quote_char = '"', encoding = 'UTF-8:UTF-8')
+    def initialize(content: nil, file: nil, path: nil, quote_char: '"', encoding: 'UTF-8:UTF-8')
+      @content = content
+      @file = file
+      @path = path
+      @quote_char = quote_char
+      @encoding = encoding
+    end
+
+    # attribute :content, String
+    # attribute :file # IO
+    # attribute :path, String
+    # attribute :quote_char, String, default: '"'
+    # attribute :encoding, String, default: 'UTF-8:UTF-8'
 
     def csv_rows
       @csv_rows ||= begin

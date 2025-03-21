@@ -4,15 +4,47 @@ module CSVImporter
   # Using the header, the model_klass and the identifier it builds the model
   # to be persisted.
   class Row
-    include Virtus.model
+    extend T::Sig
+    # include Virtus.model
 
-    attribute :header, Header
-    attribute :line_number, Integer
-    attribute :row_array, Array[String]
-    attribute :model_klass
-    attribute :identifiers # Array[Symbol] or Proc
-    attribute :after_build_blocks, Array[Proc], default: []
-    attribute :skip, Virtus::Attribute::Boolean, default: false
+    sig { returns(Header) }
+    attr_accessor :header
+
+    sig { returns(Integer) }
+    attr_accessor :line_number
+
+    sig { returns(T::Array[String]) }
+    attr_accessor :row_array
+
+    sig { returns(Class) }
+    attr_accessor :model_klass
+
+    sig { returns(T.any(Array[Symbol], Proc)) }
+    attr_accessor :identifiers
+
+    sig { returns(T::Array[Proc]) }
+    attr_accessor :after_build_blocks
+
+    sig { returns(T::Boolean) }
+    attr_accessor :skip
+
+    def initialize(header: nil, line_number:, row_array: [], model_klass: nil, identifiers: nil, after_build_blocks: [], skip: false)
+      @header = header
+      @line_number = line_number
+      @row_array = row_array
+      @model_klass = model_klass
+      @identifiers = identifiers
+      @after_build_blocks = after_build_blocks
+      @skip = skip
+    end
+
+    # attribute :header, Header
+    # attribute :line_number, Integer
+    # attribute :row_array, Array[String]
+    # attribute :model_klass
+    # attribute :identifiers # Array[Symbol] or Proc
+    # attribute :after_build_blocks, Array[Proc], default: []
+    # attribute :skip, Virtus::Attribute::Boolean, default: false
 
     # The model to be persisted
     def model

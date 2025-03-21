@@ -5,16 +5,32 @@ require 'set'
 describe CSVImporter do
   # Mimics an active record model
   class User
-    include Virtus.model
+    extend T::Sig
+    # include Virtus.model
     include ActiveModel::Model
 
-    attribute :id
-    attribute :email
-    attribute :f_name
-    attribute :l_name
-    attribute :confirmed_at
-    attribute :created_by_user_id
-    attribute :custom_fields, Hash
+    attr_accessor :id
+
+    attr_accessor :email
+
+    attr_accessor :f_name
+
+    attr_accessor :l_name
+
+    attr_accessor :confirmed_at
+
+    attr_accessor :created_by_user_id
+
+    sig { returns(T::Hash[T.untyped, T.untyped]) }
+    attr_accessor :custom_fields
+
+    # attribute :id
+    # attribute :email
+    # attribute :f_name
+    # attribute :l_name
+    # attribute :confirmed_at
+    # attribute :created_by_user_id
+    # attribute :custom_fields, Hash
 
     validates_presence_of :email
     validates_format_of :email, with: /[^@]+@[^@]/ # contains one @ symbol

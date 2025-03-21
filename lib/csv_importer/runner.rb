@@ -3,17 +3,28 @@ module CSVImporter
   #
   # It iterates over the rows' models and persist them. It returns a `Report`.
   class Runner
+    extend T::Sig
     def self.call(*args)
       new(*args).call
     end
 
-    include Virtus.model
+    sig { returns(T::Array[Row]) }
+    attr_accessor :rows
 
-    attribute :rows, Array[Row]
-    attribute :when_invalid, Symbol
-    attribute :after_save_blocks, Array[Proc], default: []
+    sig { returns(Symbol) }
+    attr_accessor :when_invalid
 
-    attribute :report, Report, default: proc { Report.new }
+    sig { returns(T::Array[Proc]) }
+    attr_accessor :after_save_blocks
+
+    sig { returns(Report) }
+    attr_accessor :report
+
+    # attribute :rows, Array[Row]
+    # attribute :when_invalid, Symbol
+    # attribute :after_save_blocks, Array[Proc], default: []
+
+    # attribute :report, Report, default: proc { Report.new }
 
     ImportAborted = Class.new(StandardError)
 

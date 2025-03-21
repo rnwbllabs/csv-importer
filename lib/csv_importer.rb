@@ -1,5 +1,4 @@
 require "csv"
-require "virtus"
 
 require "csv_importer/version"
 require "csv_importer/csv_reader"
@@ -54,8 +53,14 @@ module CSVImporter
   #
   def initialize(*args, &block)
     @csv = CSVReader.new(*args)
+    # @csv = CSVReader.new(*args)
     @config = self.class.config.dup
-    @config.attributes = args.last
+    args.last.each do |key, value|
+      if @config.respond_to?("#{key}=")
+        @config.send("#{key}=", value)
+      end
+    end
+    # @config.attributes = args.last
     @report = Report.new
     Configurator.new(@config).instance_exec(&block) if block
   end
