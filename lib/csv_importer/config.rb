@@ -1,8 +1,10 @@
+require 'virtus'
+
 module CSVImporter
   # The configuration of a CSVImporter
   class Config
     include ActiveModel::Attributes
-    # include Virtus.model
+    include Virtus.model
 
     # attr_accessor :model
 
@@ -25,19 +27,19 @@ module CSVImporter
       # @after_save_blocks = after_save_blocks
     # end
 
-    attribute :model
-    attribute :column_definitions, array: true, default: []
-    attribute :identifiers, array: true
-    attribute :when_invalid, array: true, default: :skip
-    attribute :after_build_blocks, array: true, default: []
-    attribute :after_save_blocks, array: true, default: []
-
     # attribute :model
-    # attribute :column_definitions, Array[ColumnDefinition], default: proc { [] }
-    # attribute :identifiers # Array[Symbol] or Proc
-    # attribute :when_invalid, Symbol, default: proc { :skip }
-    # attribute :after_build_blocks, Array[Proc], default: []
-    # attribute :after_save_blocks, Array[Proc], default: []
+    # attribute :column_definitions, array: true, default: []
+    # attribute :identifiers, array: true
+    # attribute :when_invalid, array: true, default: :skip
+    # attribute :after_build_blocks, array: true, default: []
+    # attribute :after_save_blocks, array: true, default: []
+
+    attribute :model
+    attribute :column_definitions, Array[ColumnDefinition], default: proc { [] }
+    attribute :identifiers # Array[Symbol] or Proc
+    attribute :when_invalid, Symbol, default: proc { :skip }
+    attribute :after_build_blocks, Array[Proc], default: []
+    attribute :after_save_blocks, Array[Proc], default: []
 
     def initialize_copy(orig)
       super

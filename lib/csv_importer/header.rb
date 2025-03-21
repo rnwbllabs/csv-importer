@@ -13,7 +13,13 @@ module CSVImporter
     attr_accessor :column_names
 
     def initialize(column_definitions: [], column_names: [])
+      if column_definitions.first.is_a?(Hash)
+        column_definitions = column_definitions.map do |definition|
+          ColumnDefinition.new(**definition)
+        end
+      end
       @column_definitions = column_definitions
+
       @column_names = column_names
     end
 

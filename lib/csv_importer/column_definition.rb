@@ -27,7 +27,7 @@ module CSVImporter
     extend T::Sig
     # include Virtus.model
 
-    sig { returns(T.nilable(Symbol)) }
+    sig { returns(T.nilable(T.any(String, Symbol))) }
     attr_accessor :name
 
     sig { returns(T.nilable(T.any(Symbol, T.untyped))) }
@@ -37,10 +37,19 @@ module CSVImporter
     sig { returns(T.untyped) }
     attr_accessor :as
 
-    def initialize(name: nil, to: nil, as: nil)
+    sig { returns(T::Boolean) }
+    attr_accessor :required
+
+    def initialize(name: nil, to: nil, as: nil, required: false)
       @name = name
       @to = to
       @as = as
+      @required = required
+    end
+
+    sig { returns(T::Boolean) }
+    def required?
+      required
     end
 
     # attribute :name, Symbol

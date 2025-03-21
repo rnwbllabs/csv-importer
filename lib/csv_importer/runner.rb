@@ -1,11 +1,13 @@
+# typed: true
+
 module CSVImporter
   # Do the actual import.
   #
   # It iterates over the rows' models and persist them. It returns a `Report`.
   class Runner
     extend T::Sig
-    def self.call(*args)
-      new(*args).call
+    def self.call(**kwargs)
+      new(**kwargs).call
     end
 
     sig { returns(T::Array[Row]) }
@@ -19,6 +21,13 @@ module CSVImporter
 
     sig { returns(Report) }
     attr_accessor :report
+
+    def initialize(rows:, when_invalid:, after_save_blocks: [], report: Report.new)
+      @rows = rows
+      @when_invalid = when_invalid
+      @after_save_blocks = after_save_blocks
+      @report = report
+    end
 
     # attribute :rows, Array[Row]
     # attribute :when_invalid, Symbol
@@ -57,21 +66,19 @@ module CSVImporter
         rows.each do |row|
           tags = []
 
-          if row.model.persisted?
-            tags << :update
-          else
-            tags << :create
-          end
+          tags << if row.model.persisted?
+                    :update
+                  else
+                    :create
+                  end
 
-          if row.skip?
-            tags << :skip
-          else
-            if row.model.save
-              tags << :success
-            else
-              tags << :failure
-            end
-          end
+          tags << if row.skip?
+                    :skip
+                  elsif row.model.save
+                    :success
+                  else
+                    :failure
+                  end
 
           add_to_report(row, tags)
 
@@ -81,7 +88,7 @@ module CSVImporter
             when 1 then block.call(row.model)
             when 2 then block.call(row.model, row.csv_attributes)
             else
-              raise ArgumentError, "after_save block of arity #{ block.arity } is not supported"
+              raise ArgumentError, "after_save block of arity #{block.arity} is not supported"
             end
           end
         end
@@ -90,21 +97,21 @@ module CSVImporter
 
     def add_to_report(row, tags)
       bucket = case tags
-      when [ :create, :success ]
-        report.created_rows
-      when [ :create, :failure ]
-        report.failed_to_create_rows
-      when [ :update, :success ]
-        report.updated_rows
-      when [ :update, :failure ]
-        report.failed_to_update_rows
-      when [ :create, :skip ]
-        report.create_skipped_rows
-      when [ :update, :skip ]
-        report.update_skipped_rows
-      else
-        raise "Invalid tags #{tags.inspect}"
-      end
+               when %i[create success]
+                 report.created_rows
+               when %i[create failure]
+                 report.failed_to_create_rows
+               when %i[update success]
+                 report.updated_rows
+               when %i[update failure]
+                 report.failed_to_update_rows
+               when %i[create skip]
+                 report.create_skipped_rows
+               when %i[update skip]
+                 report.update_skipped_rows
+               else
+                 raise "Invalid tags #{tags.inspect}"
+               end
 
       bucket << row
 

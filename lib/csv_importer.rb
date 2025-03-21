@@ -29,7 +29,7 @@ require "csv_importer/dsl"
 module CSVImporter
   class Error < StandardError; end
 
-   # Setup DSL and config object
+  # Setup DSL and config object
   def self.included(klass)
     klass.extend(Dsl)
     klass.define_singleton_method(:config) do
@@ -42,7 +42,6 @@ module CSVImporter
     include Dsl
   end
 
-
   # Defines the path, file or content of the csv file.
   # Also allows you to overwrite the configuration at runtime.
   #
@@ -52,7 +51,15 @@ module CSVImporter
   #   .new(path: "subscribers.csv", model: newsletter.subscribers)
   #
   def initialize(*args, &block)
-    @csv = CSVReader.new(*args)
+    # @csv = CSVReader.new(*args)
+    csv_reader_args = {}
+    args.first.each do |key, value|
+      if CSVReader.instance_method(:initialize).parameters.map(&:last).include?(key)
+        csv_reader_args[key] = value
+      end
+    end
+    @csv = CSVReader.new(**csv_reader_args)
+
     # @csv = CSVReader.new(*args)
     @config = self.class.config.dup
     args.last.each do |key, value|

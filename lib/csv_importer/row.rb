@@ -1,3 +1,5 @@
+# typed: true
+
 module CSVImporter
   # A Row from the CSV file.
   #
@@ -19,7 +21,7 @@ module CSVImporter
     sig { returns(Class) }
     attr_accessor :model_klass
 
-    sig { returns(T.any(Array[Symbol], Proc)) }
+    sig { returns(T.any(T::Array[Symbol], Proc)) }
     attr_accessor :identifiers
 
     sig { returns(T::Array[Proc]) }
@@ -28,7 +30,8 @@ module CSVImporter
     sig { returns(T::Boolean) }
     attr_accessor :skip
 
-    def initialize(header: nil, line_number:, row_array: [], model_klass: nil, identifiers: nil, after_build_blocks: [], skip: false)
+    def initialize(line_number:, header: nil, row_array: [], model_klass: nil, identifiers: nil,
+                   after_build_blocks: [], skip: false)
       @header = header
       @line_number = line_number
       @row_array = row_array
@@ -45,6 +48,10 @@ module CSVImporter
     # attribute :identifiers # Array[Symbol] or Proc
     # attribute :after_build_blocks, Array[Proc], default: []
     # attribute :skip, Virtus::Attribute::Boolean, default: false
+
+    def skip?
+      skip
+    end
 
     # The model to be persisted
     def model
@@ -133,7 +140,7 @@ module CSVImporter
       return nil if identifiers.empty?
 
       query = Hash[
-        identifiers.map { |identifier| [ identifier, model.public_send(identifier) ] }
+        identifiers.map { |identifier| [identifier, model.public_send(identifier)] }
       ]
       model_klass.find_by(query)
     end
