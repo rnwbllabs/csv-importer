@@ -11,8 +11,6 @@ module CSVImporter
   #
   class Report
     extend T::Sig
-    # include Virtus.model
-
     # sig { returns(Symbol) }
     attr_accessor :status
 

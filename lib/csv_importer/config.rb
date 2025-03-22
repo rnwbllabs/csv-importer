@@ -1,60 +1,60 @@
-require 'virtus'
-
 module CSVImporter
   # The configuration of a CSVImporter
   class Config
-    include ActiveModel::Attributes
-    include Virtus.model
+    # attribute :model
+    # attribute :column_definitions, Array[ColumnDefinition], default: proc { [] }
+    # attribute :identifiers # Array[Symbol] or Proc
+    # attribute :when_invalid, Symbol, default: proc { :skip }
+    # attribute :after_build_blocks, Array[Proc], default: []
+    # attribute :after_save_blocks, Array[Proc], default: []
 
-    # attr_accessor :model
-
-    # attr_accessor :column_definitions
-
-    # attr_accessor :identifiers
-
-    # attr_accessor :when_invalid
-
-    # attr_accessor :after_build_blocks
-
-    # attr_accessor :after_save_blocks
-
-    # def initialize(model:, column_definitions:, identifiers:, when_invalid: :skip, after_build_blocks: [], after_save_blocks: [])
-      # @model = model
-      # @column_definitions = column_definitions
-      # @identifiers = identifiers
-      # @when_invalid = when_invalid
-      # @after_build_blocks = after_build_blocks
-      # @after_save_blocks = after_save_blocks
+    # def initialize_copy(orig)
+    #   super
+    #   self.column_definitions = orig.column_definitions.dup
+    #   self.identifiers = orig.identifiers.dup
+    #   self.after_save_blocks = orig.after_build_blocks.dup
+    #   self.after_build_blocks = orig.after_save_blocks.dup
     # end
 
-    # attribute :model
-    # attribute :column_definitions, array: true, default: []
-    # attribute :identifiers, array: true
-    # attribute :when_invalid, array: true, default: :skip
-    # attribute :after_build_blocks, array: true, default: []
-    # attribute :after_save_blocks, array: true, default: []
+    # def after_build(block)
+    #   after_build_blocks << block
+    # end
 
-    attribute :model
-    attribute :column_definitions, Array[ColumnDefinition], default: proc { [] }
-    attribute :identifiers # Array[Symbol] or Proc
-    attribute :when_invalid, Symbol, default: proc { :skip }
-    attribute :after_build_blocks, Array[Proc], default: []
-    attribute :after_save_blocks, Array[Proc], default: []
+    # def after_save(block)
+    # after_save_blocks << block
+    # end
 
-    def initialize_copy(orig)
-      super
-      self.column_definitions = orig.column_definitions.dup
-      self.identifiers = orig.identifiers.dup
-      self.after_save_blocks = orig.after_save_blocks.dup
-      self.after_build_blocks = orig.after_build_blocks.dup
+    # Simple attributes with direct accessors
+    attr_accessor :model, :identifiers, :when_invalid
+
+    # Array attributes that need proper initialization
+    attr_accessor :column_definitions, :after_build_blocks, :after_save_blocks
+
+    def initialize
+      @column_definitions = []
+      @after_build_blocks = []
+      @after_save_blocks = []
+      @when_invalid = :skip
     end
 
+    # Allow setting array attributes while maintaining type safety
+
+    # DSL methods for adding blocks
     def after_build(block)
-      self.after_build_blocks << block
+      @after_build_blocks << block
     end
 
     def after_save(block)
-      self.after_save_blocks << block
+      @after_save_blocks << block
+    end
+
+    # Support for dup operations used in csv_importer.rb
+    def initialize_copy(orig)
+      super
+      @column_definitions = orig.column_definitions.dup
+      @identifiers = orig.identifiers.dup if orig.identifiers
+      @after_save_blocks = orig.after_build_blocks.dup
+      @after_build_blocks = orig.after_save_blocks.dup
     end
   end
 end

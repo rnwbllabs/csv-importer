@@ -1,9 +1,6 @@
 module CSVImporter
-
   # The CSV Header
   class Header
-    # include Virtus.model
-
     extend T::Sig
 
     sig { returns(T::Array[ColumnDefinition]) }
@@ -39,9 +36,9 @@ module CSVImporter
     end
 
     def column_name_for_model_attribute(attribute)
-      if column = columns.find { |column| column.definition.attribute == attribute if column.definition }
-        column.name
-      end
+      return unless column = columns.find { |column| column.definition.attribute == attribute if column.definition }
+
+      column.name
     end
 
     def valid?

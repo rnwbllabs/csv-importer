@@ -1,3 +1,5 @@
+# typed: true
+
 module CSVImporter
   # Define a column. Called from the DSL via `column.
   #
@@ -25,7 +27,6 @@ module CSVImporter
   #
   class ColumnDefinition
     extend T::Sig
-    # include Virtus.model
 
     sig { returns(T.nilable(T.any(String, Symbol))) }
     attr_accessor :name
@@ -67,7 +68,7 @@ module CSVImporter
     end
 
     # Return true if column definition matches the column name passed in.
-    def match?(column_name, search_query = (as || name))
+    def match?(column_name, search_query = as || name)
       return false if column_name.nil?
 
       downcased_column_name = column_name.downcase

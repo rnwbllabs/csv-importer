@@ -1,12 +1,9 @@
 # frozen_string_literal: true
 
 module CSVImporter
-
   # Reads, sanitize and parse a CSV file
   class CSVReader
     extend T::Sig
-    # include Virtus.model
-
 
     # sig { returns(String) }
     sig { returns(T.untyped) }
@@ -72,7 +69,7 @@ module CSVImporter
       elsif path
         File.open(path).read
       else
-        raise Error, "Please provide content, file, or path"
+        raise Error, 'Please provide content, file, or path'
       end
     end
 
@@ -82,7 +79,7 @@ module CSVImporter
         .gsub(/\r\r?\n?/, "\n") # Replaces windows line separators with "\n"
     end
 
-    SEPARATORS = [",", ";", "\t"]
+    SEPARATORS = [',', ';', "\t"]
 
     def detect_separator(csv_content)
       SEPARATORS.min_by do |separator|
@@ -94,7 +91,7 @@ module CSVImporter
         if base_number.zero?
           Float::MAX
         else
-          all_lines.map{|line| line.count(separator) - base_number }.map(&:abs).inject(0) { |sum, i| sum + i }
+          all_lines.map { |line| line.count(separator) - base_number }.map(&:abs).inject(0) { |sum, i| sum + i }
         end
       end
     end
@@ -103,7 +100,7 @@ module CSVImporter
     def sanitize_cells(rows)
       rows.map do |cells|
         cells.map do |cell|
-          cell ? cell.strip : ""
+          cell ? cell.strip : ''
         end
       end
     end
@@ -111,7 +108,7 @@ module CSVImporter
     def encode_cells(rows)
       rows.map do |cells|
         cells.map do |cell|
-          cell ? cell.encode(target_encoding) : ""
+          cell ? cell.encode(target_encoding) : ''
         end
       end
     end

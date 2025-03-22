@@ -7,7 +7,6 @@ module CSVImporter
   # to be persisted.
   class Row
     extend T::Sig
-    # include Virtus.model
 
     sig { returns(Header) }
     attr_accessor :header

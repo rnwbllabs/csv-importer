@@ -5,8 +5,6 @@ module CSVImporter
   # `ColumnDefinition` if any.
   class Column
     extend T::Sig
-    # include Virtus.model
-
     # attribute :name, String
     # attribute :definition, ColumnDefinition
 
