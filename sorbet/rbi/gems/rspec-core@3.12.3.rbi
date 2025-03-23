@@ -9211,15 +9211,6 @@ class RSpec::Core::OutputWrapper
   def method_missing(name, *args, &block); end
 
   # source://rspec-core//lib/rspec/core/output_wrapper.rb#23
-  def nonblock(*args, &block); end
-
-  # source://rspec-core//lib/rspec/core/output_wrapper.rb#23
-  def nonblock=(*args, &block); end
-
-  # source://rspec-core//lib/rspec/core/output_wrapper.rb#23
-  def nonblock?(*args, &block); end
-
-  # source://rspec-core//lib/rspec/core/output_wrapper.rb#23
   def nread(*args, &block); end
 
   # @private

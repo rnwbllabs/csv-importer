@@ -39,9 +39,9 @@ module CSVImporter
     extend T::Sig
     include Dsl
 
-    sig { returns(Config) }
     # Class level configuration, as defined by the `Config` class
     # @return [Config] - The class level configuration for the importer
+    sig { returns(Config) }
     def config
       @config ||= Config.new
     end
@@ -93,26 +93,26 @@ module CSVImporter
     Configurator.new(config: @config).instance_exec(&block) if block
   end
 
-  sig { returns(Config) }
   # Class level configuration for the importer
+  sig { returns(Config) }
   attr_reader :config
 
-  sig { returns(CSVReader) }
   # CSV reader to read the CSV file
+  sig { returns(CSVReader) }
   attr_reader :csv
 
-  sig { returns(Report) }
   # Report the result of the import
+  sig { returns(Report) }
   attr_reader :report
 
-  sig { returns(Header) }
   # Initialize and return the `Header` for the current CSV file
+  sig { returns(Header) }
   def header
     @header ||= Header.new(column_definitions: config.column_definitions, column_names: csv.header)
   end
 
-  sig { returns(T::Array[Row]) }
   # Initialize and return the `Row`s for the current CSV file
+  sig { returns(T::Array[Row]) }
   def rows
     csv.rows.map.with_index(2) do |row_array, line_number|
       Row.new(header: header, line_number: line_number, row_array: row_array, model_klass: config.model,
@@ -120,9 +120,9 @@ module CSVImporter
     end
   end
 
-  sig { returns(T::Boolean) }
   # Check if the header is valid
   # @return [T::Boolean] `true` if the header is valid, `false` otherwise
+  sig { returns(T::Boolean) }
   def valid_header?
     if @report.pending?
       @report = if header.valid?
@@ -138,9 +138,9 @@ module CSVImporter
     false
   end
 
-  sig { returns(Report) }
   # Run the import. Return a Report.
   # @return [Report] the report for the import
+  sig { returns(Report) }
   def run!
     if valid_header?
       @report = Runner.call(rows: rows, when_invalid: config.when_invalid,

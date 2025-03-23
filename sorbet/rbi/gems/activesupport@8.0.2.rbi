@@ -5371,7 +5371,7 @@ end
 # source://activesupport//lib/active_support/core_ext/enumerable.rb#25
 ActiveSupport::EnumerableCoreExt::SoleItemExpectedError = Enumerable::SoleItemExpectedError
 
-# source://activesupport//lib/active_support/environment_inquirer.rb#7
+# source://activesupport//lib/active_support/environment_inquirer.rb#9
 class ActiveSupport::EnvironmentInquirer < ::ActiveSupport::StringInquirer
   # @raise [ArgumentError]
   # @return [EnvironmentInquirer] a new instance of EnvironmentInquirer
@@ -16528,7 +16528,7 @@ class IO::Buffer
   def get_string(*_arg0); end
   def get_value(_arg0, _arg1); end
   def get_values(_arg0, _arg1); end
-  def hexdump(*_arg0); end
+  def hexdump; end
   def inspect; end
   def internal?; end
   def locked; end
@@ -16538,7 +16538,6 @@ class IO::Buffer
   def null?; end
   def or!(_arg0); end
   def pread(*_arg0); end
-  def private?; end
   def pwrite(*_arg0); end
   def read(*_arg0); end
   def readonly?; end
@@ -16566,7 +16565,6 @@ class IO::Buffer
     def for(_arg0); end
     def map(*_arg0); end
     def size_of(_arg0); end
-    def string(_arg0); end
   end
 end
 
@@ -16621,6 +16619,13 @@ IO::PRIORITY = T.let(T.unsafe(nil), Integer)
 IO::READABLE = T.let(T.unsafe(nil), Integer)
 class IO::TimeoutError < ::IOError; end
 IO::WRITABLE = T.let(T.unsafe(nil), Integer)
+
+# source://activesupport//lib/active_support/core_ext/object/json.rb#243
+class IPAddr
+  # source://activesupport//lib/active_support/core_ext/object/json.rb#244
+  def as_json(options = T.unsafe(nil)); end
+end
+
 class Integer < ::Numeric; end
 
 # source://activesupport//lib/active_support/core_ext/kernel/reporting.rb#3
@@ -16700,6 +16705,23 @@ module Kernel
     # source://activesupport//lib/active_support/core_ext/kernel/reporting.rb#26
     def with_warnings(flag); end
   end
+end
+
+class LoadError < ::ScriptError
+  include ::DidYouMean::Correctable
+end
+
+# source://activesupport//lib/active_support/core_ext/object/duplicable.rb#39
+class Method
+  # Methods are not duplicable:
+  #
+  #   method(:puts).duplicable? # => false
+  #   method(:puts).dup         # => TypeError: allocator undefined for Method
+  #
+  # @return [Boolean]
+  #
+  # source://activesupport//lib/active_support/core_ext/object/duplicable.rb#44
+  def duplicable?; end
 end
 
 # == Attribute Accessors per Thread
@@ -17885,6 +17907,18 @@ class Range
   # source://activesupport//lib/active_support/core_ext/range/compare_range.rb#41
   def include?(value); end
 
+  # @raise [TypeError]
+  # @return [Boolean]
+  #
+  # source://activesupport//lib/active_support/core_ext/range/overlap.rb#8
+  def overlap?(other); end
+
+  # @raise [TypeError]
+  # @return [Boolean]
+  #
+  # source://activesupport//lib/active_support/core_ext/range/overlap.rb#8
+  def overlaps?(other); end
+
   # source://activesupport//lib/active_support/core_ext/range/each.rb#12
   def step(n = T.unsafe(nil), &block); end
 
@@ -17893,6 +17927,13 @@ class Range
   #
   # source://activesupport//lib/active_support/core_ext/enumerable.rb#241
   def sum(initial_value = T.unsafe(nil)); end
+
+  private
+
+  # @return [Boolean]
+  #
+  # source://activesupport//lib/active_support/core_ext/range/overlap.rb#31
+  def _empty_range?(b, e, excl); end
 end
 
 # source://activesupport//lib/active_support/core_ext/object/json.rb#139
@@ -19121,6 +19162,21 @@ end
 
 # source://activesupport//lib/active_support/core_ext/object/json.rb#230
 class URI::Generic
+  include ::URI
+
   # source://activesupport//lib/active_support/core_ext/object/json.rb#231
   def as_json(options = T.unsafe(nil)); end
+end
+
+# source://activesupport//lib/active_support/core_ext/object/duplicable.rb#49
+class UnboundMethod
+  # Unbound methods are not duplicable:
+  #
+  #   method(:puts).unbind.duplicable? # => false
+  #   method(:puts).unbind.dup         # => TypeError: allocator undefined for UnboundMethod
+  #
+  # @return [Boolean]
+  #
+  # source://activesupport//lib/active_support/core_ext/object/duplicable.rb#54
+  def duplicable?; end
 end

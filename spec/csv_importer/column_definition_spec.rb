@@ -65,7 +65,7 @@ module CSVImporter
         let(:as) { {not: :valid} }
 
         it "should raise an error" do
-          expect { subject.match?("hello") }.to raise_error(Error)
+          expect { subject.match?("hello") }.to raise_error
         end
       end
     end

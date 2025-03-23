@@ -4,7 +4,6 @@ module CSVImporter
   # This Dsl extends a class that includes CSVImporter
   # It is a thin proxy to the Config object
   module Dsl
-
     # Set the model to which imported data will be mapped
     # @param model_klass [Class] the model to which imported data will be mapped
     def model(model_klass)

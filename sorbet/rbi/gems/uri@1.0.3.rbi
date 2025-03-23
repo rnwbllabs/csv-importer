@@ -6,8 +6,6 @@
 
 
 # module URI
-#
-# source://uri//lib/uri/common.rb#856
 module Kernel
   private
 
@@ -40,7 +38,6 @@ module Kernel
   end
 end
 
-# source://uri//lib/uri.rb#90
 module URI
   class << self
     # source://uri//lib/uri/common.rb#47
@@ -467,8 +464,6 @@ end
 # the structure of its path. draft-hoffman-ftp-uri-04 is a draft but it
 # is a good summary about the de facto spec.
 # https://datatracker.ietf.org/doc/html/draft-hoffman-ftp-uri-04
-#
-# source://uri//lib/uri/ftp.rb#22
 class URI::FTP < ::URI::Generic
   # == Description
   #
@@ -607,8 +602,6 @@ class URI::FTP < ::URI::Generic
 end
 
 # The "file" URI is defined by RFC8089.
-#
-# source://uri//lib/uri/file.rb#10
 class URI::File < ::URI::Generic
   # raise InvalidURIError
   #
@@ -705,8 +698,6 @@ URI::File::DEFAULT_PORT = T.let(T.unsafe(nil), T.untyped)
 
 # Base class for all URI classes.
 # Implements generic URI syntax as per RFC 2396.
-#
-# source://uri//lib/uri/generic.rb#21
 class URI::Generic
   include ::URI
 
@@ -1611,8 +1602,6 @@ end
 # passwords. This is not legal as per the RFC, but used to be
 # supported in Internet Explorer 5 and 6, before the MS04-004 security
 # update. See <URL:http://support.microsoft.com/kb/834489>.
-#
-# source://uri//lib/uri/http.rb#22
 class URI::HTTP < ::URI::Generic
   # == Description
   #
@@ -1696,8 +1685,6 @@ URI::INITIAL_SCHEMES = T.let(T.unsafe(nil), Hash)
 # --
 # ldap://<host>/<dn>[?<attrs>[?<scope>[?<filter>[?<extensions>]]]]
 # ++
-#
-# source://uri//lib/uri/ldap.rb#23
 class URI::LDAP < ::URI::Generic
   # == Description
   #
@@ -1852,8 +1839,6 @@ class URI::LDAP < ::URI::Generic
 end
 
 # RFC6068, the mailto URL scheme.
-#
-# source://uri//lib/uri/mailto.rb#17
 class URI::MailTo < ::URI::Generic
   include ::URI::RFC2396_REGEXP
 
@@ -1981,8 +1966,6 @@ end
 # Class that parses String's into URI's.
 #
 # It contains a Hash set of patterns and Regexp's that match and validate.
-#
-# source://uri//lib/uri/rfc2396_parser.rb#64
 class URI::RFC2396_Parser
   include ::URI::RFC2396_REGEXP
 
@@ -2160,7 +2143,6 @@ end
 # source://uri//lib/uri/rfc2396_parser.rb#324
 URI::RFC2396_Parser::TO_S = T.let(T.unsafe(nil), UnboundMethod)
 
-# source://uri//lib/uri/rfc3986_parser.rb#3
 class URI::RFC3986_Parser
   # @return [RFC3986_Parser] a new instance of RFC3986_Parser
   #
@@ -2236,7 +2218,6 @@ URI::RFC3986_Parser::SEG_NC = T.let(T.unsafe(nil), String)
 # source://uri//lib/uri/rfc3986_parser.rb#28
 URI::RFC3986_Parser::USERINFO = T.let(T.unsafe(nil), Regexp)
 
-# source://uri//lib/uri/common.rb#94
 module URI::Schemes; end
 
 # source://uri//lib/uri/common.rb#107
@@ -2272,7 +2253,6 @@ URI::Schemes::WSS = URI::WSS
 # source://uri//lib/uri/common.rb#312
 URI::TBLENCURICOMP_ = T.let(T.unsafe(nil), Hash)
 
-# source://uri//lib/uri/common.rb#62
 module URI::Util
   private
 
@@ -2291,8 +2271,6 @@ end
 # passwords. This is not legal as per the RFC, but used to be
 # supported in Internet Explorer 5 and 6, before the MS04-004 security
 # update. See <URL:http://support.microsoft.com/kb/834489>.
-#
-# source://uri//lib/uri/ws.rb#22
 class URI::WS < ::URI::Generic
   # == Description
   #
@@ -2339,8 +2317,6 @@ end
 # The default port for WSS URIs is 443, and the scheme is 'wss:' rather
 # than 'ws:'. Other than that, WSS URIs are identical to WS URIs;
 # see URI::WS.
-#
-# source://uri//lib/uri/wss.rb#17
 class URI::WSS < ::URI::WS; end
 
 # A Default port of 443 for URI::WSS
