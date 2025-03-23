@@ -5,8 +5,6 @@ module CSVImporter
   # `ColumnDefinition` if any.
   class Column
     extend T::Sig
-    # attribute :name, String
-    # attribute :definition, ColumnDefinition
 
     sig { returns(T.any(String, Symbol)) }
     attr_accessor :name

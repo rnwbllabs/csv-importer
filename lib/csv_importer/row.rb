@@ -30,7 +30,7 @@ module CSVImporter
     attr_accessor :skip
 
     def initialize(line_number:, header: nil, row_array: [], model_klass: nil, identifiers: nil,
-                   after_build_blocks: [], skip: false)
+      after_build_blocks: [], skip: false)
       @header = header
       @line_number = line_number
       @row_array = row_array
@@ -96,7 +96,7 @@ module CSVImporter
 
         case arity
         when 1 # to: ->(email) { email.downcase }
-          model.public_send("#{column_definition.name}=", transformer.call(csv_value))
+          model.public_send(:"#{column_definition.name}=", transformer.call(csv_value))
         when 2 # to: ->(published, post) { post.published_at = Time.now if published == "true" }
           transformer.call(csv_value, model)
         when 3 # to: ->(field_value, post, column) { post.hash_field[column.name] = field_value }
@@ -106,7 +106,7 @@ module CSVImporter
         end
       else
         attribute = column_definition.attribute
-        model.public_send("#{attribute}=", csv_value)
+        model.public_send(:"#{attribute}=", csv_value)
       end
 
       model

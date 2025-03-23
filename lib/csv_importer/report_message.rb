@@ -1,3 +1,5 @@
+# typed: false
+
 module CSVImporter
   # Generate a human readable message for the given report.
   class ReportMessage
@@ -12,7 +14,7 @@ module CSVImporter
     attr_accessor :report
 
     def to_s
-      send("report_#{report.status}")
+      send(:"report_#{report.status}")
     end
 
     private
@@ -46,9 +48,8 @@ module CSVImporter
       report.attributes
         .select { |name, _| name["_rows"] }
         .select { |_, instances| instances.size > 0 }
-        .map { |bucket, instances| "#{instances.size} #{bucket.to_s.gsub('_rows', '').gsub('_', ' ')}" }
+        .map { |bucket, instances| "#{instances.size} #{bucket.to_s.gsub("_rows", "").tr("_", " ")}" }
         .join(", ")
     end
-
   end # class ReportMessage
 end

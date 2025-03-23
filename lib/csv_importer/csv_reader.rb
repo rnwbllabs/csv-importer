@@ -1,3 +1,4 @@
+# typed: true
 # frozen_string_literal: true
 
 module CSVImporter
@@ -22,7 +23,7 @@ module CSVImporter
     attr_accessor :encoding
 
     # def initialize(content = nil, file = nil, path = nil, quote_char = '"', encoding = 'UTF-8:UTF-8')
-    def initialize(content: nil, file: nil, path: nil, quote_char: '"', encoding: 'UTF-8:UTF-8')
+    def initialize(content: nil, file: nil, path: nil, quote_char: '"', encoding: "UTF-8:UTF-8")
       @content = content
       @file = file
       @path = path
@@ -56,7 +57,7 @@ module CSVImporter
 
     # Returns the rows as an Array of Arrays of Strings
     def rows
-      @rows ||= csv_rows[1..-1]
+      @rows ||= csv_rows[1..]
     end
 
     private
@@ -67,19 +68,19 @@ module CSVImporter
       elsif file
         file.read
       elsif path
-        File.open(path).read
+        File.read(path)
       else
-        raise Error, 'Please provide content, file, or path'
+        raise Error, "Please provide content, file, or path"
       end
     end
 
     def sanitize_content(csv_content)
       csv_content
-        .encode(Encoding.find(source_encoding), invalid: :replace, undef: :replace, replace: '') # Remove invalid byte sequences
+        .encode(Encoding.find(source_encoding), invalid: :replace, undef: :replace, replace: "") # Remove invalid byte sequences
         .gsub(/\r\r?\n?/, "\n") # Replaces windows line separators with "\n"
     end
 
-    SEPARATORS = [',', ';', "\t"]
+    SEPARATORS = [",", ";", "\t"]
 
     def detect_separator(csv_content)
       SEPARATORS.min_by do |separator|
@@ -100,7 +101,7 @@ module CSVImporter
     def sanitize_cells(rows)
       rows.map do |cells|
         cells.map do |cell|
-          cell ? cell.strip : ''
+          cell ? cell.strip : ""
         end
       end
     end
@@ -108,17 +109,17 @@ module CSVImporter
     def encode_cells(rows)
       rows.map do |cells|
         cells.map do |cell|
-          cell ? cell.encode(target_encoding) : ''
+          cell ? cell.encode(target_encoding) : ""
         end
       end
     end
 
     def source_encoding
-      encoding.split(':').first || 'UTF-8'
+      encoding.split(":").first || "UTF-8"
     end
 
     def target_encoding
-      encoding.split(':').last || 'UTF-8'
+      encoding.split(":").last || "UTF-8"
     end
   end
 end

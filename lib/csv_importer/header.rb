@@ -1,3 +1,5 @@
+# typed: false
+
 module CSVImporter
   # The CSV Header
   class Header
@@ -26,7 +28,7 @@ module CSVImporter
     def columns
       column_names.map do |column_name|
         # ensure column name escapes invisible characters
-        column_name = column_name.gsub(/[^[:print:]]/, '')
+        column_name = column_name.gsub(/[^[:print:]]/, "")
 
         Column.new(
           name: column_name,

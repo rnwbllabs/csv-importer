@@ -67,18 +67,18 @@ module CSVImporter
           tags = []
 
           tags << if row.model.persisted?
-                    :update
-                  else
-                    :create
-                  end
+            :update
+          else
+            :create
+          end
 
           tags << if row.skip?
-                    :skip
-                  elsif row.model.save
-                    :success
-                  else
-                    :failure
-                  end
+            :skip
+          elsif row.model.save
+            :success
+          else
+            :failure
+          end
 
           add_to_report(row, tags)
 
@@ -97,21 +97,21 @@ module CSVImporter
 
     def add_to_report(row, tags)
       bucket = case tags
-               when %i[create success]
-                 report.created_rows
-               when %i[create failure]
-                 report.failed_to_create_rows
-               when %i[update success]
-                 report.updated_rows
-               when %i[update failure]
-                 report.failed_to_update_rows
-               when %i[create skip]
-                 report.create_skipped_rows
-               when %i[update skip]
-                 report.update_skipped_rows
-               else
-                 raise "Invalid tags #{tags.inspect}"
-               end
+      when %i[create success]
+        report.created_rows
+      when %i[create failure]
+        report.failed_to_create_rows
+      when %i[update success]
+        report.updated_rows
+      when %i[update failure]
+        report.failed_to_update_rows
+      when %i[create skip]
+        report.create_skipped_rows
+      when %i[update skip]
+        report.update_skipped_rows
+      else
+        raise "Invalid tags #{tags.inspect}"
+      end
 
       bucket << row
 

@@ -72,7 +72,7 @@ module CSVImporter
       return false if column_name.nil?
 
       downcased_column_name = column_name.downcase
-      underscored_column_name = downcased_column_name.gsub(/\s+/, '_')
+      underscored_column_name = downcased_column_name.gsub(/\s+/, "_")
 
       case search_query
       when Symbol

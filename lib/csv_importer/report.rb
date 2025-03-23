@@ -45,8 +45,8 @@ module CSVImporter
     attr_accessor :message_generator
 
     def initialize(status: :pending, missing_columns: [], extra_columns: [], parser_error: nil, created_rows: [],
-                   updated_rows: [], failed_to_create_rows: [], failed_to_update_rows: [], create_skipped_rows: [],
-                   update_skipped_rows: [], message_generator: ReportMessage)
+      updated_rows: [], failed_to_create_rows: [], failed_to_update_rows: [], create_skipped_rows: [],
+      update_skipped_rows: [], message_generator: ReportMessage)
       @status = status
       @missing_columns = missing_columns
       @extra_columns = extra_columns
