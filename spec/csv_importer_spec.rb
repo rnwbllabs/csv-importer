@@ -1,20 +1,35 @@
-require 'spec_helper'
-require 'set'
+# typed: ignore # standard:disable Sorbet/FalseSigil
+
+require "spec_helper"
 
 # High level integration specs
 describe CSVImporter do
   # Mimics an active record model
+  # standard:disable Lint/ConstantDefinitionInBlock
   class User
-    include Virtus.model
     include ActiveModel::Model
+    include ActiveModel::Validations
 
-    attribute :id
-    attribute :email
-    attribute :f_name
-    attribute :l_name
-    attribute :confirmed_at
-    attribute :created_by_user_id
-    attribute :custom_fields, Hash
+    attr_accessor :id, :email, :f_name, :l_name, :confirmed_at, :created_by_user_id, :custom_fields
+
+    def initialize(attributes = {})
+      @custom_fields = {}
+      attributes.each do |name, value|
+        send(:"#{name}=", value) if respond_to?(:"#{name}=")
+      end
+    end
+
+    def attributes
+      {
+        id: @id,
+        email: @email,
+        f_name: @f_name,
+        l_name: @l_name,
+        confirmed_at: @confirmed_at,
+        created_by_user_id: @created_by_user_id,
+        custom_fields: @custom_fields
+      }
+    end
 
     validates_presence_of :email
     validates_format_of :email, with: /[^@]+@[^@]/ # contains one @ symbol
@@ -63,7 +78,7 @@ describe CSVImporter do
 
     class ConfirmedProcessor
       def self.call(confirmed, model)
-        model.confirmed_at = confirmed == "true" ? Time.new(2012) : nil
+        model.confirmed_at = (confirmed == "true") ? Time.new(2012) : nil
       end
     end
 
@@ -71,11 +86,11 @@ describe CSVImporter do
 
     column :email, required: true, as: /email/i, to: ->(email) { email.downcase }
     column :f_name, as: :first_name, required: true
-    column :last_name,  to: :l_name
-    column :confirmed,  to: ConfirmedProcessor
-    column :extra, as: /extra/i, to: ->(value, model, column) do
+    column :last_name, to: :l_name
+    column :confirmed, to: ConfirmedProcessor
+    column :extra, as: /extra/i, to: lambda { |value, model, column|
       model.custom_fields[column.name] = value
-    end
+    }
 
     identifier :email # will find_or_update via
 
@@ -89,26 +104,25 @@ describe CSVImporter do
 
     column :email, required: true
     column :first_name, to: :f_name, required: true
-    column :last_name,  to: :l_name
-    column :confirmed,  to: ->(confirmed, model) do
-      model.confirmed_at = confirmed == "true" ? Time.new(2012) : nil
-    end
+    column :last_name, to: :l_name
+    column :confirmed, to: lambda { |confirmed, model|
+      model.confirmed_at = (confirmed == "true") ? Time.new(2012) : nil
+    }
 
     identifier :f_name
 
     when_invalid :abort
 
-    after_build do |model|
-      model.email.downcase! if model.email
-    end
+    after_build { |model| model.email&.downcase! }
   end
+  # standard:enable Lint/ConstantDefinitionInBlock
 
   before do
     User.reset_store!
   end
 
   describe "happy path" do
-    it 'imports' do
+    it "imports" do
       csv_content = "email,confirmed,first_name,last_name,extra_1,extra_2
 BOB@example.com,true,bob,,meta1,meta2"
 
@@ -124,7 +138,7 @@ BOB@example.com,true,bob,,meta1,meta2"
           "last_name" => "",
           "confirmed" => "true",
           "extra_1" => "meta1",
-          "extra_2" => "meta2",
+          "extra_2" => "meta2"
         }
       )
 
@@ -149,16 +163,16 @@ BOB@example.com,true,bob,,meta1,meta2"
       )
     end
 
-      it "records the correct line number for each row" do
-        csv_content = "email,confirmed,first_name,last_name
+    it "records the correct line number for each row" do
+      csv_content = "email,confirmed,first_name,last_name
 BOB@example.com,true,bob,,"
-        import = ImportUserCSV.new(content: csv_content)
-        import.run!
+      import = ImportUserCSV.new(content: csv_content)
+      import.run!
 
-        expect(import.report.valid_rows.size).to eq(1)
-        expect(import.report.created_rows.size).to eq(1)
-        expect(import.report.created_rows.first.line_number).to eq(2)
-      end
+      expect(import.report.valid_rows.size).to eq(1)
+      expect(import.report.created_rows.size).to eq(1)
+      expect(import.report.created_rows.first.line_number).to eq(2)
+    end
   end
 
   describe "invalid records" do
@@ -202,7 +216,7 @@ BOB@example.com,true,bob,,"
 
   describe "missing required columns" do
     let(:csv_content) do
-"confirmed,first_name,last_name
+      "confirmed,first_name,last_name
 bob@example.com,true,,last,"
     end
 
@@ -237,7 +251,7 @@ bob@example.com,true,,last,"
 
       expect(import.header.missing_required_columns).to be_empty
       expect(import.header.missing_columns)
-        .to eq(["last_name", "confirmed", "extra"])
+        .to eq(%w[last_name confirmed extra])
     end
   end
 
@@ -456,7 +470,7 @@ bob@example.com   ,  true,   bob   , \"the dude\" jones,"
       email: "bob@example.com",
       confirmed_at: Time.new(2012),
       f_name: "bob",
-      l_name: "\"the dude\" jones"
+      l_name: '"the dude" jones'
     )
   end
 
@@ -465,9 +479,9 @@ bob@example.com   ,  true,   bob   , \"the dude\" jones,"
 ,,,,"
     import = ImportUserCSV.new(content: csv_content)
 
-    expect {
+    expect do
       import.run!
-    }.to_not raise_error(NoMethodError, "undefined method `downcase' for nil:NilClass")
+    end.to_not raise_error(NoMethodError, "undefined method `downcase' for nil:NilClass")
   end
 
   describe "#when_invalid" do
@@ -503,14 +517,13 @@ new-mark@example.com,false,new mark,lee"
 
       expect(report.created_rows.size).to eq(0)
       expect(report.updated_rows.size).to eq(1)
-
     end
   end
 
   it "handles invalid csv files" do
-    csv_content = %|email,confirmed,first_name,last_name,,
+    csv_content = %(email,confirmed,first_name,last_name,,
 bob@example.com,"false"
-bob@example.com,false,,in,,,"""|
+bob@example.com,false,,in,,,""")
 
     expect(ImportUserCSV.new(content: csv_content)).to_not be_valid_header
 
@@ -521,8 +534,8 @@ bob@example.com,false,,in,,,"""|
   end
 
   it "matches columns via regexp" do
-    csv_content = %|Email Address,confirmed,first_name,last_name,,
-bob@example.com,false,bob,,|
+    csv_content = %(Email Address,confirmed,first_name,last_name,,
+bob@example.com,false,bob,,)
 
     import = ImportUserCSV.new(content: csv_content).run!
 
@@ -531,7 +544,6 @@ bob@example.com,false,bob,,|
   end
 
   describe ".after_build" do
-
     it "overwrites attributes" do
       csv_content = "email,confirmed,first_name,last_name
 BOB@example.com,true,bob,,"
@@ -570,9 +582,7 @@ BOB@example.com,true,bob,,"
           model.created_by_user_id = current_user_id
         end
 
-        after_build do |model|
-          model.email.gsub!('@', '+imported@') if model.email
-        end
+        after_build { |model| model.email&.gsub!("@", "+imported@") }
       end
 
       import.run!
@@ -594,7 +604,7 @@ BOB@example.com,true,bob,,"
         end
       end
 
-      import_bar = ImportUserCSV.new(content: csv_content) do
+      ImportUserCSV.new(content: csv_content) do
         after_build do |model|
           log << "bar"
         end
@@ -626,15 +636,13 @@ BOB@example.com,true,bob,,"
 
         after_save do |user, attributes|
           # representing maybe a realistic OtherResource.find_by(name: 'invalid')
-          if user.email == 'invalid'
-            user.errors.add(:email, "'#{ attributes['email'] }' could not be found")
-          end
+          user.errors.add(:email, "'#{attributes["email"]}' could not be found") if user.email == "invalid"
         end
       end
 
-      expect {
+      expect do
         import.run!
-      }.to change { success_array }.from([]).to([true, false])
+      end.to change { success_array }.from([]).to([true, false])
 
       expect(saves_count).to eq 2
 

@@ -50,5 +50,4 @@ guard :rspec, cmd: "bundle exec rspec" do
 
   # Specs are fast, let's run them all!
   watch(%r{^lib/(.+)\.rb$}) { |m| "spec" }
-
 end
