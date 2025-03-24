@@ -10,90 +10,49 @@ module CSVImporter
   class Row
     extend T::Sig
 
-    sig { returns(T.nilable(Header)) }
-    # @!attribute [r] header
+    # @!attribute [rw] header
     # @return [Header, nil] the header of the row
-    attr_reader :header
+    sig { returns(T.nilable(Header)) }
+    attr_accessor :header
 
-    sig { params(value: T.nilable(Header)).void }
-    # Sets the header for the row
-    # @param value [Header, nil] the header to set
-    def header=(value)
-      @header = value
-    end
-
-    sig { returns(Integer) }
-    # @!attribute [r] line_number
+    # @!attribute [rw] line_number
     # @return [Integer] the line number of the row in the CSV file
-    attr_reader :line_number
+    sig { returns(Integer) }
+    attr_accessor :line_number
 
-    sig { params(value: Integer).void }
-    # Sets the line number for the row
-    # @param value [Integer] the line number to set
-    def line_number=(value)
-      @line_number = value
-    end
-
-    sig { returns(T::Array[String]) }
-    # @!attribute [r] row_array
+    # @!attribute [rw] row_array
     # @return [Array<String>] the array of values from the row
-    attr_reader :row_array
+    sig { returns(T::Array[String]) }
+    attr_accessor :row_array
 
-    sig { params(value: T::Array[String]).void }
-    # Sets the row array values
-    # @param value [Array<String>] the array of values to set
-    def row_array=(value)
-      @row_array = value
-    end
-
-    sig { returns(T.untyped) }
-    # @!attribute [r] model_klass
+    # @!attribute [rw] model_klass
     # @return [Class] the model class that will be instantiated
-    attr_reader :model_klass
+    sig { returns(T.untyped) }
+    attr_accessor :model_klass
 
-    sig { params(value: T.untyped).void }
-    # Sets the model class
-    # @param value [Class] the model class to set
-    def model_klass=(value)
-      @model_klass = value
-    end
-
-    sig { returns(T.nilable(T.any(T::Array[Symbol], Proc))) }
-    # @!attribute [r] identifiers
+    # @!attribute [rw] identifiers
     # @return [Array<Symbol>, Proc, nil] identifiers used to find existing records
-    attr_reader :identifiers
+    sig { returns(T.nilable(T.any(T::Array[Symbol], Proc))) }
+    attr_accessor :identifiers
 
-    sig { params(value: T.nilable(T.any(T::Array[Symbol], Proc))).void }
-    # Sets the identifiers for finding existing records
-    # @param value [Array<Symbol>, Proc, nil] the identifiers to set
-    def identifiers=(value)
-      @identifiers = value
-    end
-
-    sig { returns(T::Array[Proc]) }
-    # @!attribute [r] after_build_blocks
+    # @!attribute [rw] after_build_blocks
     # @return [Array<Proc>] blocks to run after building the model
-    attr_reader :after_build_blocks
+    sig { returns(T::Array[Proc]) }
+    attr_accessor :after_build_blocks
 
-    sig { params(value: T::Array[Proc]).void }
-    # Sets the after build blocks
-    # @param value [Array<Proc>] the blocks to run after building
-    def after_build_blocks=(value)
-      @after_build_blocks = value
-    end
-
-    sig { returns(T::Boolean) }
-    # @!attribute [r] skip
+    # @!attribute [rw] skip
     # @return [Boolean] whether this row should be skipped
-    attr_reader :skip
+    sig { returns(T::Boolean) }
+    attr_accessor :skip
 
-    sig { params(value: T::Boolean).void }
-    # Sets whether this row should be skipped
-    # @param value [Boolean] true if the row should be skipped
-    def skip=(value)
-      @skip = value
-    end
-
+    # Initialize a new Row
+    # @param line_number [Integer] The line number in the CSV file
+    # @param header [Header, nil] The CSV header
+    # @param row_array [Array<String>] The raw values from the CSV row
+    # @param model_klass [Class] The class to instantiate for this row
+    # @param identifiers [Array<Symbol>, Proc, nil] Identifiers to find existing records
+    # @param after_build_blocks [Array<Proc>] Blocks to run after building the model
+    # @param skip [Boolean] Whether to skip this row
     sig do
       params(
         line_number: Integer,
@@ -105,14 +64,6 @@ module CSVImporter
         skip: T::Boolean
       ).void
     end
-    # Initialize a new Row
-    # @param line_number [Integer] The line number in the CSV file
-    # @param header [Header, nil] The CSV header
-    # @param row_array [Array<String>] The raw values from the CSV row
-    # @param model_klass [Class] The class to instantiate for this row
-    # @param identifiers [Array<Symbol>, Proc, nil] Identifiers to find existing records
-    # @param after_build_blocks [Array<Proc>] Blocks to run after building the model
-    # @param skip [Boolean] Whether to skip this row
     def initialize(line_number:, header: nil, row_array: [], model_klass: nil, identifiers: nil,
       after_build_blocks: [], skip: false)
       @header = T.let(header, T.nilable(Header))
@@ -123,19 +74,19 @@ module CSVImporter
       @after_build_blocks = T.let(after_build_blocks, T::Array[Proc])
       @skip = T.let(skip, T::Boolean)
       @model = T.let(nil, T.untyped)
-      @csv_attributes = T.let(nil, T.untyped)
+      @csv_attributes = T.let(nil, T.nilable(T::Hash[String, String]))
     end
 
-    sig { returns(T::Boolean) }
     # Check if this row should be skipped
     # @return [Boolean] true if the row should be skipped
+    sig { returns(T::Boolean) }
     def skip?
       skip
     end
 
-    sig { returns(T.untyped) }
     # The model to be persisted
     # @return [Object] The built model instance with attributes set
+    sig { returns(T.untyped) }
     def model
       @model ||= begin
         model = find_or_build_model
@@ -150,26 +101,31 @@ module CSVImporter
       end
     end
 
-    sig { returns(T::Hash[String, String]) }
     # A hash with this row's attributes
     # @return [Hash<String, String>] Mapping of column names to values
+    sig { returns(T.nilable(T::Hash[String, String])) }
     def csv_attributes
       @csv_attributes ||= begin
+        return nil if header.nil?
+
         # Safely handle nil header
-        column_names = T.must(header).column_names
-        T.cast([column_names.zip(row_array)].to_h, T::Hash[String, String])
+        column_names = header.column_names
+        Hash[column_names.zip(row_array)]
       end
     end
 
-    sig { params(model: T.untyped).returns(T.untyped) }
-    # Set attributes on the associated model
+    # Set attributes
     # @param model [Object] The model to set attributes on
     # @return [Object] The model with attributes set
+    sig { params(model: T.untyped).returns(T.untyped) }
     def set_attributes(model)
       # Safely handle nil header
-      T.must(header).columns.each do |column|
+      return model if header.nil?
+
+      header.columns.each do |column|
         name = T.cast(column.name, String)
-        value = csv_attributes[name]
+        attrs = T.must(csv_attributes)
+        value = attrs[name]
         begin
           value = value.dup if value
         rescue TypeError
@@ -184,12 +140,12 @@ module CSVImporter
       model
     end
 
-    sig { params(model: T.untyped, column: T.untyped, csv_value: T.untyped).returns(T.untyped) }
-    # Set an attribute on the model using the column_definition and the csv_value
+    # Set the attribute using the column_definition and the csv_value
     # @param model [Object] The model to set attributes on
     # @param column [Column] The column to set
     # @param csv_value [String, nil] The value from the CSV
     # @return [Object] The model with attribute set
+    sig { params(model: T.untyped, column: T.untyped, csv_value: T.untyped).returns(T.untyped) }
     def set_attribute(model, column, csv_value)
       column_definition = column.definition
       transformer = column_definition.to
@@ -214,13 +170,13 @@ module CSVImporter
       model
     end
 
-    sig { returns(T::Hash[T.any(String, Symbol), T.nilable(String)]) }
-    # Errors from the model mapped back to the CSV header if we can
+    # Error from the model mapped back to the CSV header if we can
     # @return [Hash] Errors mapped to CSV column names where possible
+    sig { returns(T::Hash[T.any(String, Symbol), T.nilable(String)]) }
     def errors
       Hash[
         model.errors.to_hash.map do |attribute, errors|
-          if header && (column_name = T.must(header).column_name_for_model_attribute(attribute))
+          if header && (column_name = header.column_name_for_model_attribute(attribute))
             [column_name, errors.last]
           else
             [attribute, errors.last]
@@ -229,16 +185,16 @@ module CSVImporter
       ]
     end
 
-    sig { returns(T.untyped) }
     # Find an existing record or build a new one
     # @return [Object] Found or newly built model instance
+    sig { returns(T.untyped) }
     def find_or_build_model
       find_model || build_model
     end
 
-    sig { returns(T.untyped) }
     # Find an existing model based on identifiers
     # @return [Object, nil] Found model instance or nil if not found
+    sig { returns(T.untyped) }
     def find_model
       return nil if identifiers.nil?
 
@@ -254,16 +210,16 @@ module CSVImporter
       T.unsafe(model_klass).find_by(query)
     end
 
-    sig { returns(T.untyped) }
     # Build a new model instance
     # @return [Object] New model instance
+    sig { returns(T.untyped) }
     def build_model
       model_klass.new
     end
 
-    sig { returns(T.self_type) }
     # Mark this row to be skipped
     # @return [self] Self for method chaining
+    sig { returns(T.self_type) }
     def skip!
       self.skip = true
       self
@@ -271,19 +227,19 @@ module CSVImporter
 
     private
 
-    sig { params(model: T.untyped).returns(T::Array[Symbol]) }
     # Get the actual identifiers to use for the model
     # @param model [Object] The model to get identifiers for
     # @return [Array<Symbol>] The identifiers to use
+    sig { params(model: T.untyped).returns(T::Array[Symbol]) }
     def model_identifiers(model)
       ids = @identifiers
       if ids.nil?
-        T.cast([], T::Array[Symbol])
+        []
       elsif ids.is_a?(Proc)
         # Use T.unsafe to handle the variable return type from the Proc
-        T.cast([T.unsafe(ids).call(model)].flatten, T::Array[Symbol])
+        [T.unsafe(ids).call(model)].flatten
       else
-        T.cast(ids, T::Array[Symbol])
+        ids
       end
     end
   end

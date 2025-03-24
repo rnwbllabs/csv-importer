@@ -75,9 +75,11 @@ module CSVImporter
   #   .new(path: "subscribers.csv", model: newsletter.subscribers)
   #
   def initialize(options = {}, &block)
+    # Extract arguments for CSVReader using its defined parameter list
     csv_reader_args = options.select do |key, _|
-      CSVReader.instance_method(:initialize).parameters.map(&:last).include?(key)
+      CSVReader::INITIALIZE_PARAMS.include?(key)
     end
+
     @csv = CSVReader.new(**csv_reader_args)
 
     # Duplicate class level configuration to allow instance level configuration

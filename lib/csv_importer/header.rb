@@ -62,9 +62,10 @@ module CSVImporter
     # @return [String, Symbol, nil] the column name for the attribute, or nil if the attribute is not found
     sig { params(attribute: T.any(Symbol, String)).returns(T.nilable(T.any(String, Symbol))) }
     def column_name_for_model_attribute(attribute)
-      return unless column = columns.find do |column|
+      column = columns.find do |column|
         T.must(column.definition).attribute == attribute if column.definition
       end
+      return unless column
 
       column.name
     end

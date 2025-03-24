@@ -20,112 +20,57 @@ module CSVImporter
     # @!attribute [r] status
     # @return [Symbol] Current status of the import process
     sig { returns(Symbol) }
-    attr_reader :status
-
-    # Sets the status of the import process
-    # @param value [Symbol] The new status value
-    sig { params(value: Symbol).void }
-    attr_writer :status
+    attr_accessor :status
 
     # @!attribute [r] missing_columns
     # @return [Array<String>] Column names required by the importer but missing from the CSV
     sig { returns(T::Array[String]) }
-    attr_reader :missing_columns
-
-    # Sets the missing columns
-    # @param value [Array<String>] The new list of missing columns
-    sig { params(value: T::Array[String]).void }
-    attr_writer :missing_columns
+    attr_accessor :missing_columns
 
     # @!attribute [r] extra_columns
     # @return [Array<String>] Column names present in the CSV but not defined in the importer
     sig { returns(T::Array[String]) }
-    attr_reader :extra_columns
-
-    # Sets the extra columns
-    # @param value [Array<String>] The new list of extra columns
-    sig { params(value: T::Array[String]).void }
-    attr_writer :extra_columns
+    attr_accessor :extra_columns
 
     # @!attribute [r] parser_error
     # @return [String, nil] Error message from the CSV parser if parsing failed
     sig { returns(T.nilable(String)) }
-    attr_reader :parser_error
-
-    # Sets the parser error message
-    # @param value [String, nil] The new parser error message
-    sig { params(value: T.nilable(String)).void }
-    attr_writer :parser_error
+    attr_accessor :parser_error
 
     # @!attribute [r] created_rows
     # @return [Array<Row>] Rows that were successfully created in the database
     sig { returns(T::Array[Row]) }
-    attr_reader :created_rows
-
-    # Sets the created rows
-    # @param value [Array<Row>] The new list of created rows
-    sig { params(value: T::Array[Row]).void }
-    attr_writer :created_rows
+    attr_accessor :created_rows
 
     # @!attribute [r] updated_rows
     # @return [Array<Row>] Rows that were successfully updated in the database
     sig { returns(T::Array[Row]) }
-    attr_reader :updated_rows
-
-    # Sets the updated rows
-    # @param value [Array<Row>] The new list of updated rows
-    sig { params(value: T::Array[Row]).void }
-    attr_writer :updated_rows
+    attr_accessor :updated_rows
 
     # @!attribute [r] failed_to_create_rows
     # @return [Array<Row>] Rows that could not be created due to validation failures
     sig { returns(T::Array[Row]) }
-    attr_reader :failed_to_create_rows
-
-    # Sets the rows that failed to create
-    # @param value [Array<Row>] The new list of rows that failed to create
-    sig { params(value: T::Array[Row]).void }
-    attr_writer :failed_to_create_rows
+    attr_accessor :failed_to_create_rows
 
     # @!attribute [r] failed_to_update_rows
     # @return [Array<Row>] Rows that could not be updated due to validation failures
     sig { returns(T::Array[Row]) }
-    attr_reader :failed_to_update_rows
-
-    # Sets the rows that failed to update
-    # @param value [Array<Row>] The new list of rows that failed to update
-    sig { params(value: T::Array[Row]).void }
-    attr_writer :failed_to_update_rows
+    attr_accessor :failed_to_update_rows
 
     # @!attribute [r] create_skipped_rows
     # @return [Array<Row>] Rows that were skipped during creation (via skip!)
     sig { returns(T::Array[Row]) }
-    attr_reader :create_skipped_rows
-
-    # Sets the rows skipped during creation
-    # @param value [Array<Row>] The new list of rows skipped during creation
-    sig { params(value: T::Array[Row]).void }
-    attr_writer :create_skipped_rows
+    attr_accessor :create_skipped_rows
 
     # @!attribute [r] update_skipped_rows
     # @return [Array<Row>] Rows that were skipped during update (via skip!)
     sig { returns(T::Array[Row]) }
-    attr_reader :update_skipped_rows
-
-    # Sets the rows skipped during update
-    # @param value [Array<Row>] The new list of rows skipped during update
-    sig { params(value: T::Array[Row]).void }
-    attr_writer :update_skipped_rows
+    attr_accessor :update_skipped_rows
 
     # @!attribute [r] message_generator
     # @return [Class] The class responsible for generating human-readable messages
     sig { returns(T.class_of(ReportMessage)) }
-    attr_reader :message_generator
-
-    # Sets the message generator class
-    # @param value [Class] The new message generator class
-    sig { params(value: T.class_of(ReportMessage)).void }
-    attr_writer :message_generator
+    attr_accessor :message_generator
 
     # Initialize a new Report with default values
     # @param status [Symbol] Initial status of the import

@@ -68,7 +68,7 @@ module CSVImporter
     # @return [String] the invalid CSV file report message
     sig { returns(String) }
     def report_invalid_csv_file
-      report.parser_error
+      report.parser_error || "Invalid CSV file"
     end
 
     # Aborted report message
@@ -84,7 +84,7 @@ module CSVImporter
     sig { returns(String) }
     def import_details
       report.attributes
-        .select { |name, _| name["_rows"] }
+        .select { |name, _| name.to_s.include?("_rows") }
         .select { |_, instances| instances.size > 0 }
         .map { |bucket, instances| "#{instances.size} #{bucket.to_s.gsub("_rows", "").tr("_", " ")}" }
         .join(", ")
