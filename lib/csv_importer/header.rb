@@ -78,15 +78,15 @@ module CSVImporter
     end
 
     # Required columns for the importer
-    # @return [Array[String, Symbol]] the required columns, based on the column definitions
-    sig { returns(T::Array[T.any(String, Symbol)]) }
+    # @return [Array[String]] the required columns, based on the column definitions
+    sig { returns(T::Array[String]) }
     def required_columns
-      column_definitions.select(&:required?).filter_map(&:name)
+      column_definitions.select(&:required?).filter_map(&:name).map(&:to_s)
     end
 
     # Extra columns for the importer, i.e., columns that are not defined in the column definitions
-    # @return [Array[String, Symbol]] the extra columns, based on the column definitions
-    sig { returns(T::Array[T.any(String, Symbol)]) }
+    # @return [Array[String]] the extra columns, based on the column definitions
+    sig { returns(T::Array[String]) }
     def extra_columns
       columns.reject(&:definition).filter_map(&:name).map(&:to_s)
     end

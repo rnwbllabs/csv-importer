@@ -81,7 +81,7 @@ module CSVImporter
     # Extract arguments for CSVReader using its defined parameter list
     csv_reader_args = options.slice(*CSVReader::INITIALIZE_PARAMS)
 
-    @csv = T.let(CSVReader.new(T.unsafe(**csv_reader_args)), CSVReader)
+    @csv = T.let(T.unsafe(CSVReader).new(**csv_reader_args), CSVReader)
 
     # Duplicate class level configuration to allow instance level configuration
     @config = T.let(T.unsafe(self).class.config.dup, Config)

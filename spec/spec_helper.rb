@@ -1,4 +1,4 @@
-# typed: false
+# typed: ignore # standard:disable Sorbet/FalseSigil
 
 require "simplecov"
 SimpleCov.start

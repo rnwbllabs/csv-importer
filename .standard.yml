@@ -1,2 +1,4 @@
 plugins:
   - standard-sorbet
+ignore:
+  - "sorbet/rbi/**/*"

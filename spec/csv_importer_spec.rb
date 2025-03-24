@@ -1,10 +1,11 @@
-# typed: false
+# typed: ignore # standard:disable Sorbet/FalseSigil
 
 require "spec_helper"
 
 # High level integration specs
 describe CSVImporter do
   # Mimics an active record model
+  # standard:disable Lint/ConstantDefinitionInBlock
   class User
     include ActiveModel::Model
     include ActiveModel::Validations
@@ -112,10 +113,9 @@ describe CSVImporter do
 
     when_invalid :abort
 
-    after_build do |model|
-      model.email.downcase! if model.email
-    end
+    after_build { |model| model.email&.downcase! }
   end
+  # standard:enable Lint/ConstantDefinitionInBlock
 
   before do
     User.reset_store!
@@ -582,9 +582,7 @@ BOB@example.com,true,bob,,"
           model.created_by_user_id = current_user_id
         end
 
-        after_build do |model|
-          model.email.gsub!("@", "+imported@") if model.email
-        end
+        after_build { |model| model.email&.gsub!("@", "+imported@") }
       end
 
       import.run!
