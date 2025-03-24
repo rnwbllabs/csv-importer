@@ -19,16 +19,18 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "csv"
-  spec.add_dependency "sorbet-runtime"
+  spec.add_dependency "csv", "~> 3.0"
+  spec.add_dependency "sorbet-runtime", "~> 0.5"
 
-  spec.add_development_dependency "activemodel", "~> 8"
-  spec.add_development_dependency "rake"
+  spec.add_development_dependency "activemodel", "~> 8.0"
+  spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.12.0"
-  spec.add_development_dependency "simplecov"
-  spec.add_development_dependency "sorbet"
-  spec.add_development_dependency "spoom"
-  spec.add_development_dependency "standard"
-  spec.add_development_dependency "standard-sorbet"
-  spec.add_development_dependency "tapioca"
+  spec.add_development_dependency "simplecov", "~> 0.22.0"
+  spec.add_development_dependency "sorbet", "~> 0.5"
+  spec.add_development_dependency "spoom", "~> 1.2"
+  spec.add_development_dependency "standard", "~> 1.31"
+  spec.add_development_dependency "standard-sorbet", "~> 0.0.2"
+  spec.add_development_dependency "tapioca", "~> 0.11"
+
+  spec.required_ruby_version = ">= 3.0"
 end
