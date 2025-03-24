@@ -74,7 +74,7 @@ module CSVImporter
       @after_build_blocks = T.let(after_build_blocks, T::Array[Proc])
       @skip = T.let(skip, T::Boolean)
       @model = T.let(nil, T.untyped)
-      @csv_attributes = T.let(nil, T.nilable(T::Hash[String, String]))
+      @csv_attributes = T.let(nil, T.nilable(T::Hash[T.any(String, Symbol), T.nilable(String)]))
     end
 
     # Check if this row should be skipped
@@ -102,15 +102,15 @@ module CSVImporter
     end
 
     # A hash with this row's attributes
-    # @return [Hash<String, String>] Mapping of column names to values
-    sig { returns(T.nilable(T::Hash[String, String])) }
+    # @return [Hash<String|Symbol, String|nil>] Mapping of column names to values
+    sig { returns(T.nilable(T::Hash[T.any(String, Symbol), T.nilable(String)])) }
     def csv_attributes
       @csv_attributes ||= begin
         return nil if header.nil?
 
-        # Safely handle nil header
-        column_names = header.column_names
-        Hash[column_names.zip(row_array)]
+        # After the nil check, we know header is present
+        column_names = T.must(header).column_names
+        column_names.zip(row_array).to_h
       end
     end
 
@@ -122,7 +122,7 @@ module CSVImporter
       # Safely handle nil header
       return model if header.nil?
 
-      header.columns.each do |column|
+      T.must(header).columns.each do |column|
         name = T.cast(column.name, String)
         attrs = T.must(csv_attributes)
         value = attrs[name]
@@ -174,15 +174,13 @@ module CSVImporter
     # @return [Hash] Errors mapped to CSV column names where possible
     sig { returns(T::Hash[T.any(String, Symbol), T.nilable(String)]) }
     def errors
-      Hash[
-        model.errors.to_hash.map do |attribute, errors|
-          if header && (column_name = header.column_name_for_model_attribute(attribute))
-            [column_name, errors.last]
-          else
-            [attribute, errors.last]
-          end
+      model.errors.to_hash.map do |attribute, errors|
+        if header && (column_name = T.must(header).column_name_for_model_attribute(attribute))
+          [column_name, errors.last]
+        else
+          [attribute, errors.last]
         end
-      ]
+      end.to_h
     end
 
     # Find an existing record or build a new one
@@ -204,9 +202,7 @@ module CSVImporter
       ids = model_identifiers(model)
       return nil if ids.empty?
 
-      query = Hash[
-        ids.map { |identifier| [identifier, model.public_send(identifier)] }
-      ]
+      query = ids.map { |identifier| [identifier, model.public_send(identifier)] }.to_h
       T.unsafe(model_klass).find_by(query)
     end
 

@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 module CSVImporter
@@ -16,6 +16,9 @@ module CSVImporter
     # List of parameters accepted by the initialize method.
     # This is used by CSVImporter to filter options.
     INITIALIZE_PARAMS = [:content, :file, :path, :quote_char, :encoding].freeze
+
+    # Supported CSV delimiter characters
+    SEPARATORS = [",", ";", "\t"].freeze
 
     # The raw CSV content string
     # @!attribute [rw] content
@@ -48,7 +51,6 @@ module CSVImporter
     attr_accessor :encoding
 
     # Initialize a new CSVReader with the provided options.
-    #
     # @param content [String, nil] the raw CSV content
     # @param file [IO, StringIO, nil] the file object containing CSV data
     # @param path [String, nil] the path to the CSV file
@@ -64,17 +66,18 @@ module CSVImporter
         encoding: String
       ).void
     end
-
     def initialize(content: nil, file: nil, path: nil, quote_char: '"', encoding: "UTF-8:UTF-8")
       @content = content
       @file = file
       @path = path
       @quote_char = quote_char
       @encoding = encoding
+      @csv_rows = T.let(nil, T.nilable(T::Array[T::Array[String]]))
+      @header = T.let(nil, T.nilable(T::Array[String]))
+      @rows = T.let(nil, T.nilable(T::Array[T::Array[String]]))
     end
 
     # Parse the CSV content and return rows of cells.
-    #
     # @return [Array<Array<String>>] the parsed CSV rows
     sig { returns(T::Array[T::Array[String]]) }
     def csv_rows
@@ -85,13 +88,12 @@ module CSVImporter
           sane_content,
           col_sep: separator, quote_char: quote_char, skip_blanks: true,
           external_encoding: source_encoding
-        )
+        ).to_a # Convert CSV::Table to Array explicitly
         sanitize_cells(encode_cells(cells))
       end
     end
 
     # Returns the header row (first row) of the CSV.
-    #
     # @return [Array<String>] the header row
     sig { returns(T::Array[String]) }
     def header
@@ -99,7 +101,6 @@ module CSVImporter
     end
 
     # Returns the data rows (all rows except the header) of the CSV.
-    #
     # @return [Array<Array<String>>] the data rows
     sig { returns(T::Array[T::Array[String]]) }
     def rows
@@ -109,25 +110,22 @@ module CSVImporter
     private
 
     # Read content from the provided source (content string, file, or path).
-    #
-    # @return [String] the raw CSV content
+    #    # @return [String] the raw CSV content
     # @raise [Error] if no content source is provided
     sig { returns(String) }
     def read_content
       if content
-        content
+        content.to_s
       elsif file
-        file.read
+        T.must(file).read.to_s
       elsif path
-        File.read(path)
+        File.read(T.must(path).to_s).to_s
       else
-        # The tests expect this to raise an error when no content source is provided
         raise Error, "Please provide content, file, or path"
       end
     end
 
     # Sanitize the CSV content by handling encoding issues and line separators.
-    #
     # @param csv_content [String] the raw CSV content
     # @return [String] the sanitized CSV content
     sig { params(csv_content: String).returns(String) }
@@ -137,20 +135,26 @@ module CSVImporter
         .gsub(/\r\r?\n?/, "\n") # Replaces windows line separators with "\n"
     end
 
-    # Supported CSV delimiter characters
-    SEPARATORS = [",", ";", "\t"].freeze
-
     # Detect the most likely delimiter character used in the CSV.
+    # Assume a correct CSV file has the same count of separators in each line. We calculate deviations from the base
+    # number, counting points of inconsistencies in each line. Correct/valid CSV will have a score of 0. We take the
+    # separator with the least score.
     #
     # @param csv_content [String] the sanitized CSV content
     # @return [String] the detected delimiter character
+    # @example with 3 commas in header, 2 in one line and 5 in another - then score for comma would be 3
+    #   ( abs(3-2) + abs(3-5) = 1 + 2 = 3 ).
     sig { params(csv_content: String).returns(String) }
     def detect_separator(csv_content)
       all_lines = csv_content.lines
       return "," if all_lines.empty?
 
-      SEPARATORS.min_by do |separator|
-        base_number = all_lines.first.count(separator)
+      # Header or first line of the CSV
+      first_line = all_lines.first || ""
+
+      # Find the separator with the most consistent occurrence across lines
+      best_separator = SEPARATORS.min_by do |separator|
+        base_number = first_line.count(separator)
 
         if base_number.zero?
           Float::MAX
@@ -158,10 +162,11 @@ module CSVImporter
           all_lines.map { |line| line.count(separator) - base_number }.map(&:abs).inject(0) { |sum, i| sum + i }
         end
       end
+
+      T.must(best_separator)
     end
 
     # Remove trailing white spaces from cells and ensure all cells are strings.
-    #
     # @param rows [Array<Array>] the parsed CSV rows
     # @return [Array<Array<String>>] the sanitized rows
     sig { params(rows: T::Array[T::Array[T.untyped]]).returns(T::Array[T::Array[String]]) }
@@ -174,7 +179,6 @@ module CSVImporter
     end
 
     # Encode all cells to the target encoding.
-    #
     # @param rows [Array<Array>] the parsed CSV rows
     # @return [Array<Array>] the encoded rows
     sig { params(rows: T::Array[T::Array[T.untyped]]).returns(T::Array[T::Array[T.untyped]]) }
@@ -187,7 +191,6 @@ module CSVImporter
     end
 
     # Extract the source encoding from the encoding specification.
-    #
     # @return [String] the source encoding
     sig { returns(String) }
     def source_encoding
@@ -195,7 +198,6 @@ module CSVImporter
     end
 
     # Extract the target encoding from the encoding specification.
-    #
     # @return [String] the target encoding
     sig { returns(String) }
     def target_encoding

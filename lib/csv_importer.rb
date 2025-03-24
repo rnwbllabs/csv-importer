@@ -1,4 +1,5 @@
-# typed: true
+# typed: strict
+# frozen_string_literal: true
 
 require "csv"
 
@@ -43,6 +44,7 @@ module CSVImporter
     # @return [Config] - The class level configuration for the importer
     sig { returns(Config) }
     def config
+      @config = T.let(@config, T.nilable(Config)) unless defined?(@config)
       @config ||= Config.new
     end
   end
@@ -74,23 +76,23 @@ module CSVImporter
   #   .new(file: my_csv_file)
   #   .new(path: "subscribers.csv", model: newsletter.subscribers)
   #
+  sig { params(options: T::Hash[Symbol, T.anything], block: T.nilable(T.proc.params(arg0: T.untyped).returns(T.anything))).void }
   def initialize(options = {}, &block)
     # Extract arguments for CSVReader using its defined parameter list
-    csv_reader_args = options.select do |key, _|
-      CSVReader::INITIALIZE_PARAMS.include?(key)
-    end
+    csv_reader_args = options.slice(*CSVReader::INITIALIZE_PARAMS)
 
-    @csv = CSVReader.new(**csv_reader_args)
+    @csv = T.let(CSVReader.new(T.unsafe(**csv_reader_args)), CSVReader)
 
     # Duplicate class level configuration to allow instance level configuration
-    @config = T.unsafe(self).class.config.dup
+    @config = T.let(T.unsafe(self).class.config.dup, Config)
 
-    config_options = options.except(*csv_reader_args.keys)
+    config_options = T.unsafe(options).except(*csv_reader_args.keys)
     config_options.each do |key, value|
       @config.send(:"#{key}=", value) if @config.respond_to?(:"#{key}=")
     end
 
-    @report = Report.new
+    @report = T.let(Report.new, Report)
+    @header = T.let(nil, T.nilable(Header))
 
     Configurator.new(config: @config).instance_exec(&block) if block
   end
