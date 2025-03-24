@@ -11,3 +11,6 @@ jobs:
           bundler-cache: true
       - name: Standard
         uses: standardrb/standard-ruby-action@v1
+        with:
+          autofix: false
+          workdir: lib/
