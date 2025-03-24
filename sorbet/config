@@ -1,0 +1,8 @@
+--dir
+.
+--ignore=tmp/
+--ignore=vendor/
+--ignore=sorbet/rbi
+--enable-experimental-requires-ancestor
+
+
