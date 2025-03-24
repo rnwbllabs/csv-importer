@@ -11,3 +11,5 @@
 /spec/examples.txt
 .idea/
 .vscode/
+*.gem
+pkg/
