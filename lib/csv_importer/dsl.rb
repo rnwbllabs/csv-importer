@@ -36,7 +36,7 @@ module CSVImporter
         virtual: T.nilable(T::Boolean)
       ).void
     end
-    def column(name, to: nil, as: nil, required: false , virtual: false)
+    def column(name, to: nil, as: nil, required: false, virtual: false)
       column_definition = ColumnDefinition.new(
         name:, to:, as:, required: required || false, virtual: virtual || false
       )
