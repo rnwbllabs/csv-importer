@@ -58,6 +58,11 @@ module CSVImporter
     sig { returns(T::Boolean) }
     attr_accessor :required
 
+    # @!attribute [rw] virtual
+    # @return [Boolean] whether the column is virtual
+    sig { returns(T::Boolean) }
+    attr_accessor :virtual
+
     # Initialize a new column definition
     # @param name [Symbol, String, nil] the name of the column in the CSV file
     # @param to [Symbol, Proc, nil] the attribute on the model that will be set with the value of the column. If nil,
@@ -70,14 +75,16 @@ module CSVImporter
         name: T.nilable(T.any(String, Symbol)),
         to: ToType,
         as: AsType,
-        required: T::Boolean
+        required: T::Boolean,
+        virtual: T::Boolean
       ).void
     end
-    def initialize(name: nil, to: nil, as: nil, required: false)
+    def initialize(name: nil, to: nil, as: nil, required: false, virtual: false)
       @name = name
       @to = to
       @as = as
       @required = required
+      @virtual = virtual
     end
 
     # Whether the column is required, i.e., the model will raise an error if the column is not present in the CSV file.
@@ -85,6 +92,13 @@ module CSVImporter
     sig { returns(T::Boolean) }
     def required?
       required
+    end
+
+    # Whether the column is virtual, i.e., not present on the associated model and won't be set on the model at all.
+    # @return [Boolean] `true` if the column is virtual, `false` otherwise
+    sig { returns(T::Boolean) }
+    def virtual?
+      virtual
     end
 
     # Attribute on the model that will be set with the value of the column

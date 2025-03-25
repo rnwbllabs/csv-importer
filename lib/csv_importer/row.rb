@@ -140,7 +140,11 @@ module CSVImporter
           # can't dup Symbols, Integer etc...
         end
 
-        next if column.definition.nil?
+        definition = column.definition
+
+        next unless definition
+
+        next if definition.virtual?
 
         set_attribute(model, column, value)
       end

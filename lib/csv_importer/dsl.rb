@@ -22,19 +22,23 @@ module CSVImporter
     #   the name of the column in the CSV file will be used.
     # @param as [Symbol, String, Regexp, Array, nil] more complex matching logic for the name of the column in the CSV file.
     #   If nil, the name of the column in the CSV file will be used.
-    # @param required [Boolean] whether the column is required
+    # @param required [Boolean] [Optional] whether the column is required, i.e., the importer will raise an error if
+    #   the column is not present in the CSV file. Defaults to false.
+    # @param virtual [Boolean] [Optional] whether the column is virtual, i.e., not present on the associated model and
+    #   won't be set on the model at all. Defaults to false.
     # @param options [Hash] the options for the column
     sig do
       params(
         name: Symbol,
         to: CSVImporter::ColumnDefinition::ToType,
         as: CSVImporter::ColumnDefinition::AsType,
-        required: T.nilable(T::Boolean)
+        required: T.nilable(T::Boolean),
+        virtual: T.nilable(T::Boolean)
       ).void
     end
-    def column(name, to: nil, as: nil, required: false)
+    def column(name, to: nil, as: nil, required: false , virtual: false)
       column_definition = ColumnDefinition.new(
-        name:, to:, as:, required: required || false
+        name:, to:, as:, required: required || false, virtual: virtual || false
       )
       config.column_definitions << column_definition
     end

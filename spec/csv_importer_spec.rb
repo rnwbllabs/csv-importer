@@ -115,6 +115,35 @@ describe CSVImporter do
 
     after_build { |model| model.email&.downcase! }
   end
+
+  class ImportUserWithDatastoreCSV
+    include CSVImporter
+
+    model User
+
+    column :email, required: true
+    column :first_name, to: :f_name, required: true
+    column :last_name, to: :l_name
+    column :confirmed_by_name, virtual: true
+
+    identifier :email
+
+    before_import do
+      # Store a mapping of names to confirmation timestamps
+      confirm_map = {
+        "admin" => Time.new(2012),
+        "manager" => Time.new(2013),
+        "staff" => Time.new(2014)
+      }
+      datastore[:confirmation_map] = confirm_map
+    end
+
+    after_build do |user|
+      # Use the datastore to set confirmed_at based on confirmed_by_name
+      confirmer = csv_attributes["confirmed_by_name"]
+      user.confirmed_at = datastore[:confirmation_map][confirmer] if confirmer
+    end
+  end
   # standard:enable Lint/ConstantDefinitionInBlock
 
   before do
@@ -680,4 +709,82 @@ mark@example.com,false,mark,new_last_name"
       expect(import.report.message).to eq "Import completed: 1 updated, 1 create skipped"
     end
   end # describe "skipping"
+
+  describe "before_import and datastore" do
+    it "executes before_import blocks before processing rows" do
+      csv_content = "email,first_name,last_name\nbob@example.com,bob,smith"
+
+      # Set up a way to track execution order
+      execution_order = []
+
+      custom_importer = Class.new do
+        include CSVImporter
+        model User
+
+        column :email
+        column :first_name, to: :f_name
+
+        before_import do
+          execution_order << :before_import
+        end
+
+        after_build do |model|
+          execution_order << :after_build
+        end
+      end
+
+      import = custom_importer.new(content: csv_content)
+      import.run!
+
+      # Check that before_import ran before after_build
+      expect(execution_order).to eq([:before_import, :after_build])
+    end
+
+    it "makes datastore accessible in after_build blocks" do
+      csv_content = "email,first_name,last_name,confirmed_by_name
+bob@example.com,bob,smith,admin
+jane@example.com,jane,doe,manager"
+
+      import = ImportUserWithDatastoreCSV.new(content: csv_content)
+      import.run!
+
+      # Verify the reference was correctly looked up and set
+      bob = User.find_by(email: "bob@example.com")
+      expect(bob.confirmed_at).to eq(Time.new(2012))
+
+      jane = User.find_by(email: "jane@example.com")
+      expect(jane.confirmed_at).to eq(Time.new(2013))
+    end
+
+    it "allows datastore to be updated during import" do
+      csv_content = "email,first_name,last_name
+first@example.com,first,user
+second@example.com,second,user"
+
+      counter_importer = Class.new do
+        include CSVImporter
+        model User
+
+        column :email
+        column :first_name, to: :f_name
+        column :last_name, to: :l_name
+
+        before_import do
+          datastore[:row_count] = 0
+        end
+
+        after_build do |user|
+          datastore[:row_count] += 1
+          user.email = "user#{datastore[:row_count]}@example.com"
+        end
+      end
+
+      import = counter_importer.new(content: csv_content)
+      import.run!
+
+      # Check the emails were sequentially numbered
+      expect(User.find_by(f_name: "first").email).to eq("user1@example.com")
+      expect(User.find_by(f_name: "second").email).to eq("user2@example.com")
+    end
+  end
 end
