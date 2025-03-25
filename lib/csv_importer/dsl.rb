@@ -58,8 +58,26 @@ module CSVImporter
       config.when_invalid = action
     end
 
-    # Block to run before the import is run
-    # @param block [Proc] the block to run before the import is run
+    # Define a block to run before the import process starts.
+    # This runs before any rows are processed, making it ideal for:
+    # - Preloading reference data needed for lookups
+    # - Setting up context for the import
+    # - Preparing data structures to optimize performance
+    #
+    # The block has access to the datastore, which contains any custom parameters
+    # passed during initialization.
+    #
+    # @example Preload data for efficient lookups
+    #   before_import do
+    #     # Access constructor parameters
+    #     company_id = datastore[:company_id]
+    #
+    #     # Preload data for lookups
+    #     employees = Employee.where(company_id: company_id).all
+    #     datastore[:employee_lookup] = employees.index_by(&:email)
+    #   end
+    #
+    # @param block [Proc] A block to run before the import starts
     sig { params(block: Proc).void }
     def before_import(&block)
       config.before_import(block)

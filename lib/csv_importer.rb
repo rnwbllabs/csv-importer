@@ -69,34 +69,57 @@ module CSVImporter
     end
   end
 
-  # Defines the path, file or content of the csv file.
-  # Also allows you to overwrite the configuration at runtime.
+  # Storage for data that can be accessed during the import process. This hash is populated with:
+  # 1. Any initialization parameters that aren't used by CSVReader or Config
+  # 2. Values set by `before_import` hooks
+  # 3. Values used in `after_build` hooks
   #
-  # @param options [Hash] the options to pass to the CSVReader
-  # @yield [Configurator] a block to configure the importer
+  # @example Access constructor parameters in hooks
+  #   # When initializing
+  #   importer = MyImporter.new(file: csv_file, company_id: 123)
   #
-  # @example:
-  #   .new(file: my_csv_file)
-  #   .new(path: "subscribers.csv", model: newsletter.subscribers)
+  #   # In hooks
+  #   before_import do
+  #     # Access the company_id parameter
+  #     company = Company.find(datastore[:company_id])
+  #     # Store calculated values for later
+  #     datastore[:employees] = company.employees.index_by(&:id)
+  #   end
   #
+  # @return [Hash<Symbol, Object>] A hash for storing and accessing data throughout the import
+  sig { returns(T::Hash[Symbol, T.anything]) }
+  attr_reader :datastore
+
+  # Initialize a new importer
+  # @param options [Hash] Options for the importer. Options are categorized as follows:
+  #   - CSVReader options (content:, file:, path:, etc.) are passed to CSVReader
+  #   - Config options that match the config object attributes are set on the config
+  #   - Any other options are stored in the datastore and accessible in hooks
+  # @yield [Configurator] A block to configure the importer
+  # @return [void]
   sig { params(options: T::Hash[Symbol, T.anything], block: T.nilable(T.proc.params(arg0: T.untyped).returns(T.anything))).void }
   def initialize(options = {}, &block)
-    # Extract arguments for CSVReader using its defined parameter list
-    csv_reader_args = options.slice(*CSVReader::INITIALIZE_PARAMS)
+    csv_options = {}
+    config_options = {}
+    datastore_options = {}
 
-    @csv = T.let(T.unsafe(CSVReader).new(**csv_reader_args), CSVReader)
-
-    # Duplicate class level configuration to allow instance level configuration
-    @config = T.let(T.unsafe(self).class.config.dup, Config)
-
-    config_options = T.unsafe(options).except(*csv_reader_args.keys)
-    config_options.each do |key, value|
-      @config.send(:"#{key}=", value) if @config.respond_to?(:"#{key}=")
+    options.each do |key, value|
+      if CSVReader::INITIALIZE_PARAMS.include?(key)
+        csv_options[key] = value
+      elsif T.unsafe(self).class.config.respond_to?(:"#{key}=")
+        config_options[key] = value
+      else
+        datastore_options[key] = value
+      end
     end
 
+    @csv = T.let(CSVReader.new(**csv_options), CSVReader)
+    @config = T.let(T.unsafe(self).class.config.dup, Config)
+    @datastore = T.let(datastore_options, T::Hash[Symbol, T.anything])
     @report = T.let(Report.new, Report)
     @header = T.let(nil, T.nilable(Header))
-    @datastore = T.let({}, T::Hash[Symbol, T.anything])
+
+    config_options.each { |k, v| @config.send(:"#{k}=", v) }
 
     Configurator.new(config: @config).instance_exec(&block) if block
   end
@@ -118,12 +141,6 @@ module CSVImporter
   # @return [Report] - The report for the import
   sig { returns(Report) }
   attr_reader :report
-
-  # Storage for data that can be accessed during the import process
-  # @!attribute [r] datastore
-  # @return [T::Hash[Symbol, T.anything]] - The datastore for the import
-  sig { returns(T::Hash[Symbol, T.anything]) }
-  attr_reader :datastore
 
   # Initialize and return the `Header` for the current CSV file
   # @return [Header] - The header for the import

@@ -786,5 +786,53 @@ second@example.com,second,user"
       expect(User.find_by(f_name: "first").email).to eq("user1@example.com")
       expect(User.find_by(f_name: "second").email).to eq("user2@example.com")
     end
+
+    it "makes constructor parameters available in datastore" do
+      custom_importer = Class.new do
+        include CSVImporter
+
+        def self.name
+          "CustomUserImporter"
+        end
+
+        model User
+
+        column :first_name, to: :f_name
+        column :last_name, to: :l_name
+
+        before_import do
+          datastore[:email_domain] ||= "default.com"
+        end
+
+        after_build do |user|
+          domain = datastore[:email_domain]
+          user.email = "#{user.f_name}@#{domain}"
+        end
+      end
+
+      # Reset the user store to ensure clean state
+      User.reset_store!
+      # Verify we start with just the seed user
+      expect(User.store.size).to eq(1)
+
+      csv_content = "first_name,last_name\nbob,smith\njane,doe"
+
+      import = custom_importer.new(
+        content: csv_content,
+        email_domain: "example.org"
+      )
+      import.run!
+
+      # Verify the parameter was used correctly
+      expect(User.store.size).to eq(3) # 1 existing + 2 new users
+
+      bob = User.find_by(f_name: "bob")
+      expect(bob).not_to be_nil
+      expect(bob.email).to eq("bob@example.org")
+
+      jane = User.find_by(f_name: "jane")
+      expect(jane).not_to be_nil
+      expect(jane.email).to eq("jane@example.org")
+    end
   end
 end
