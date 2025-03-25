@@ -31,6 +31,12 @@ module CSVImporter
     sig { returns(T::Array[ColumnDefinition]) }
     attr_accessor :column_definitions
 
+    # The blocks to perform before the import is run, i.e., before any rows are processed whatsoever
+    # @!attribute [rw] before_import_blocks
+    # @return [T::Array[Proc]] the blocks to perform before the import is run
+    sig { returns(T::Array[Proc]) }
+    attr_accessor :before_import_blocks
+
     # The blocks to run after a record is built
     # @!attribute [rw] after_build_blocks
     # @return [T::Array[Proc]] the blocks to run after a record is built
@@ -47,9 +53,18 @@ module CSVImporter
     sig { void }
     def initialize
       @column_definitions = T.let([], T::Array[ColumnDefinition])
+      @before_import_blocks = T.let([], T::Array[Proc])
       @after_build_blocks = T.let([], T::Array[Proc])
       @after_save_blocks = T.let([], T::Array[Proc])
       @when_invalid = T.let(:skip, Symbol)
+    end
+
+    # Add a block to run before the import is run
+    # @param block [Proc] the block to run before the import is run
+    # @note the proc will be added to the config's before_import_blocks array
+    sig { params(block: Proc).void }
+    def before_import(block)
+      @before_import_blocks << block
     end
 
     # Add a block to run after a record is built

@@ -93,6 +93,7 @@ module CSVImporter
 
     @report = T.let(Report.new, Report)
     @header = T.let(nil, T.nilable(Header))
+    @datastore = T.let({}, T::Hash[Symbol, T.anything])
 
     Configurator.new(config: @config).instance_exec(&block) if block
   end
@@ -109,6 +110,10 @@ module CSVImporter
   sig { returns(Report) }
   attr_reader :report
 
+  # Storage for data that can be accessed during the import process
+  sig { returns(T::Hash[Symbol, T.anything]) }
+  attr_reader :datastore
+
   # Initialize and return the `Header` for the current CSV file
   sig { returns(Header) }
   def header
@@ -120,7 +125,7 @@ module CSVImporter
   def rows
     csv.rows.map.with_index(2) do |row_array, line_number|
       Row.new(header: header, line_number: line_number, row_array: row_array, model_klass: config.model,
-        identifiers: config.identifiers, after_build_blocks: config.after_build_blocks)
+        identifiers: config.identifiers, after_build_blocks: config.after_build_blocks, datastore: datastore)
     end
   end
 
@@ -147,6 +152,13 @@ module CSVImporter
   sig { returns(Report) }
   def run!
     if valid_header?
+      config.before_import_blocks.each do |block|
+        case block.arity
+        when 0 then T.unsafe(self).instance_exec(&block)
+        when 1 then T.unsafe(self).instance_exec(self, &block)
+        end
+      end
+
       @report = Runner.call(rows: rows, when_invalid: config.when_invalid,
         after_save_blocks: config.after_save_blocks, report: @report)
     else

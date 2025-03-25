@@ -4,12 +4,15 @@ module CSVImporter
   # This Dsl extends a class that includes CSVImporter
   # It is a thin proxy to the Config object
   module Dsl
+    extend T::Sig
+
     # Set the model to which imported data will be mapped
     # @param model_klass [Class] the model to which imported data will be mapped
     def model(model_klass)
       config.model = model_klass
     end
 
+    sig { params(name: Symbol, options: T::Hash[Symbol, T.anything]).void }
     # Define a column for the model
     # @param name [Symbol] the name of the column
     # @param options [Hash] the options for the column
@@ -25,18 +28,28 @@ module CSVImporter
 
     alias_method :identifiers, :identifier
 
+    sig { params(action: Symbol).void }
     # Action to take when a record is invalid
     # @param action [Symbol] the action to take when a record is invalid
     def when_invalid(action)
       config.when_invalid = action
     end
 
+    sig { params(block: Proc).void }
+    # Block to run before the import is run
+    # @param block [Proc] the block to run before the import is run
+    def before_import(&block)
+      config.before_import(block)
+    end
+
+    sig { params(block: Proc).void }
     # Block to run after a record is built
     # @param block [Proc] the block to run after a record is built
     def after_build(&block)
       config.after_build(block)
     end
 
+    sig { params(block: Proc).void }
     # Block to run after a record is saved
     # @param block [Proc] the block to run after a record is saved
     def after_save(&block)
