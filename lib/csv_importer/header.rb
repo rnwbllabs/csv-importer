@@ -24,20 +24,10 @@ module CSVImporter
     # to an empty array.
     # @param column_names [Array[String]] [Optional] the column names for the importer. Defaults to an empty array.
     sig do
-      params(column_definitions: T::Array[T.any(T::Hash[T.any(Symbol, String), T.untyped], ColumnDefinition)],
-        column_names: T::Array[T.any(String, Symbol)]).void
+      params(column_definitions: T::Array[ColumnDefinition], column_names: T::Array[T.any(String, Symbol)]).void
     end
     def initialize(column_definitions: [], column_names: [])
-      constructed_column_definitions = if column_definitions.first.is_a?(Hash)
-        column_definitions.map do |definition|
-          hash_attributes = T.cast(definition, T::Hash[T.any(Symbol, String), T.untyped])
-          symbolized_hash_attributes = hash_attributes.transform_keys!(&:to_sym)
-          ColumnDefinition.new(**symbolized_hash_attributes)
-        end
-      else
-        T.cast(column_definitions, T::Array[ColumnDefinition])
-      end
-      @column_definitions = T.let(constructed_column_definitions, T::Array[ColumnDefinition])
+      @column_definitions = T.let(column_definitions, T::Array[ColumnDefinition])
 
       @column_names = column_names
     end

@@ -32,6 +32,10 @@ module CSVImporter
   class ColumnDefinition
     extend T::Sig
 
+    ToType = T.type_alias { T.nilable(T.any(Symbol, T.untyped)) }
+    AsNonArrayType = T.type_alias { T.nilable(T.any(Symbol, String, Regexp)) }
+    AsType = T.type_alias { T.nilable(T.any(AsNonArrayType, T::Array[AsNonArrayType])) }
+
     # @!attribute [rw] name
     # @return [String, Symbol, nil] the name of the column in the CSV file
     sig { returns(T.nilable(T.any(String, Symbol))) }
@@ -40,19 +44,24 @@ module CSVImporter
     # @!attribute [rw] to
     # @return [Symbol, T.untyped, nil] the attribute on the model that will be set with the value of the column.
     #  If nil, the name of the column in the CSV file will be used.
-    sig { returns(T.nilable(T.any(Symbol, T.untyped))) }
+    sig { returns(ToType) }
     attr_accessor :to
 
     # @!attribute [rw] as
-    # @return [Symbol, String, Regexp, Array, nil] more complex matching logic for the name of the column in the CSV
-    #   file. If nil, the name of the column in the CSV file will be used.
-    sig { returns(T.nilable(T.any(Symbol, String, Regexp, T::Array[T.any(Symbol, String, Regexp)]))) }
+    # @return [Symbol, String, Regexp, Array<Symbol, String, Regexp>, nil] more complex matching logic for the name
+    #   of the column in the CSV file. If nil, the name of the column in the CSV file will be used.
+    sig { returns(AsType) }
     attr_accessor :as
 
     # @!attribute [rw] required
     # @return [Boolean] whether the column is required
     sig { returns(T::Boolean) }
     attr_accessor :required
+
+    # @!attribute [rw] virtual
+    # @return [Boolean] whether the column is virtual
+    sig { returns(T::Boolean) }
+    attr_accessor :virtual
 
     # Initialize a new column definition
     # @param name [Symbol, String, nil] the name of the column in the CSV file
@@ -64,16 +73,18 @@ module CSVImporter
     sig do
       params(
         name: T.nilable(T.any(String, Symbol)),
-        to: T.nilable(T.any(Symbol, T.untyped)),
-        as: T.nilable(T.any(Symbol, String, Regexp, T.untyped)),
-        required: T::Boolean
+        to: ToType,
+        as: AsType,
+        required: T::Boolean,
+        virtual: T::Boolean
       ).void
     end
-    def initialize(name: nil, to: nil, as: nil, required: false)
+    def initialize(name: nil, to: nil, as: nil, required: false, virtual: false)
       @name = name
       @to = to
       @as = as
       @required = required
+      @virtual = virtual
     end
 
     # Whether the column is required, i.e., the model will raise an error if the column is not present in the CSV file.
@@ -81,6 +92,13 @@ module CSVImporter
     sig { returns(T::Boolean) }
     def required?
       required
+    end
+
+    # Whether the column is virtual, i.e., not present on the associated model and won't be set on the model at all.
+    # @return [Boolean] `true` if the column is virtual, `false` otherwise
+    sig { returns(T::Boolean) }
+    def virtual?
+      virtual
     end
 
     # Attribute on the model that will be set with the value of the column
@@ -102,7 +120,7 @@ module CSVImporter
     sig do
       params(
         column_name: T.nilable(String),
-        search_query: T.nilable(T.any(Symbol, String, Regexp, T::Array[T.any(Symbol, String, Regexp)]))
+        search_query: AsType
       ).returns(T::Boolean)
     end
     def match?(column_name, search_query = nil)

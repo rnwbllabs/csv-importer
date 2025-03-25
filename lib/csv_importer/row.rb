@@ -45,6 +45,11 @@ module CSVImporter
     sig { returns(T::Boolean) }
     attr_accessor :skip
 
+    # @!attribute [r] datastore
+    # @return [Hash<Symbol, T.anything>] Storage for data that can be accessed during the import process
+    sig { returns(T::Hash[Symbol, T.anything]) }
+    attr_reader :datastore
+
     # Initialize a new Row
     # @param line_number [Integer] The line number in the CSV file
     # @param header [Header, nil] The CSV header
@@ -53,6 +58,7 @@ module CSVImporter
     # @param identifiers [Array<Symbol>, Proc, nil] Identifiers to find existing records
     # @param after_build_blocks [Array<Proc>] Blocks to run after building the model
     # @param skip [Boolean] Whether to skip this row
+    # @param datastore [Hash<Symbol, T.anything>] Storage for data that can be accessed during the import process
     sig do
       params(
         line_number: Integer,
@@ -61,11 +67,12 @@ module CSVImporter
         model_klass: T.untyped,
         identifiers: T.nilable(T.any(T::Array[Symbol], Proc)),
         after_build_blocks: T::Array[Proc],
-        skip: T::Boolean
+        skip: T::Boolean,
+        datastore: T::Hash[Symbol, T.anything]
       ).void
     end
     def initialize(line_number:, header: nil, row_array: [], model_klass: nil, identifiers: nil,
-      after_build_blocks: [], skip: false)
+      after_build_blocks: [], skip: false, datastore: {})
       @header = T.let(header, T.nilable(Header))
       @line_number = T.let(line_number, Integer)
       @row_array = T.let(row_array, T::Array[String])
@@ -75,6 +82,7 @@ module CSVImporter
       @skip = T.let(skip, T::Boolean)
       @model = T.let(nil, T.untyped)
       @csv_attributes = T.let(nil, T.nilable(T::Hash[T.any(String, Symbol), T.nilable(String)]))
+      @datastore = T.let(datastore, T::Hash[Symbol, T.anything])
     end
 
     # Check if this row should be skipped
@@ -132,7 +140,11 @@ module CSVImporter
           # can't dup Symbols, Integer etc...
         end
 
-        next if column.definition.nil?
+        definition = column.definition
+
+        next unless definition
+
+        next if definition.virtual?
 
         set_attribute(model, column, value)
       end
