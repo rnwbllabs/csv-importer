@@ -32,6 +32,10 @@ module CSVImporter
   class ColumnDefinition
     extend T::Sig
 
+    ToType = T.type_alias { T.nilable(T.any(Symbol, T.untyped)) }
+    AsNonArrayType = T.type_alias { T.nilable(T.any(Symbol, String, Regexp)) }
+    AsType = T.type_alias { T.nilable(T.any(AsNonArrayType, T::Array[AsNonArrayType])) }
+
     # @!attribute [rw] name
     # @return [String, Symbol, nil] the name of the column in the CSV file
     sig { returns(T.nilable(T.any(String, Symbol))) }
@@ -40,13 +44,13 @@ module CSVImporter
     # @!attribute [rw] to
     # @return [Symbol, T.untyped, nil] the attribute on the model that will be set with the value of the column.
     #  If nil, the name of the column in the CSV file will be used.
-    sig { returns(T.nilable(T.any(Symbol, T.untyped))) }
+    sig { returns(ToType) }
     attr_accessor :to
 
     # @!attribute [rw] as
-    # @return [Symbol, String, Regexp, Array, nil] more complex matching logic for the name of the column in the CSV
-    #   file. If nil, the name of the column in the CSV file will be used.
-    sig { returns(T.nilable(T.any(Symbol, String, Regexp, T::Array[T.any(Symbol, String, Regexp)]))) }
+    # @return [Symbol, String, Regexp, Array<Symbol, String, Regexp>, nil] more complex matching logic for the name
+    #   of the column in the CSV file. If nil, the name of the column in the CSV file will be used.
+    sig { returns(AsType) }
     attr_accessor :as
 
     # @!attribute [rw] required
@@ -64,8 +68,8 @@ module CSVImporter
     sig do
       params(
         name: T.nilable(T.any(String, Symbol)),
-        to: T.nilable(T.any(Symbol, T.untyped)),
-        as: T.nilable(T.any(Symbol, String, Regexp, T.untyped)),
+        to: ToType,
+        as: AsType,
         required: T::Boolean
       ).void
     end
@@ -102,7 +106,7 @@ module CSVImporter
     sig do
       params(
         column_name: T.nilable(String),
-        search_query: T.nilable(T.any(Symbol, String, Regexp, T::Array[T.any(Symbol, String, Regexp)]))
+        search_query: AsType
       ).returns(T::Boolean)
     end
     def match?(column_name, search_query = nil)

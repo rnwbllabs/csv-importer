@@ -7,6 +7,7 @@ require "csv_importer/version"
 require "csv_importer/csv_reader"
 require "csv_importer/column_definition"
 require "csv_importer/column"
+require "csv_importer/config_interface"
 require "csv_importer/header"
 require "csv_importer/row"
 require "csv_importer/report"
@@ -38,11 +39,12 @@ module CSVImporter
   # Setup DSL and config object
   module ClassMethods
     extend T::Sig
+    include ::CSVImporter::ConfigInterface
     include Dsl
 
     # Class level configuration, as defined by the `Config` class
     # @return [Config] - The class level configuration for the importer
-    sig { returns(Config) }
+    sig { override.returns(Config) }
     def config
       @config = T.let(@config, T.nilable(Config)) unless defined?(@config)
       @config ||= Config.new
@@ -55,9 +57,10 @@ module CSVImporter
   # Instance level config will run against this configurator
   class Configurator
     extend T::Sig
+    include ConfigInterface
     include Dsl
 
-    sig { returns(Config) }
+    sig { override.returns(Config) }
     attr_reader :config
 
     sig { params(config: Config).void }
@@ -99,28 +102,38 @@ module CSVImporter
   end
 
   # Class level configuration for the importer
+  # @!attribute [r] config
+  # @return [Config] - The class level configuration for the importer
   sig { returns(Config) }
   attr_reader :config
 
   # CSV reader to read the CSV file
+  # @!attribute [r] csv
+  # @return [CSVReader] - The CSV reader for the importer
   sig { returns(CSVReader) }
   attr_reader :csv
 
   # Report the result of the import
+  # @!attribute [r] report
+  # @return [Report] - The report for the import
   sig { returns(Report) }
   attr_reader :report
 
   # Storage for data that can be accessed during the import process
+  # @!attribute [r] datastore
+  # @return [T::Hash[Symbol, T.anything]] - The datastore for the import
   sig { returns(T::Hash[Symbol, T.anything]) }
   attr_reader :datastore
 
   # Initialize and return the `Header` for the current CSV file
+  # @return [Header] - The header for the import
   sig { returns(Header) }
   def header
     @header ||= Header.new(column_definitions: config.column_definitions, column_names: csv.header)
   end
 
   # Initialize and return the `Row`s for the current CSV file
+  # @return [T::Array[Row]] - The rows for the import
   sig { returns(T::Array[Row]) }
   def rows
     csv.rows.map.with_index(2) do |row_array, line_number|
