@@ -6,7 +6,7 @@ real data.
 CSVImporter aims to handle validations, column mapping, import
 and reporting.
 
-[![CI Status](https://github.com/YOUR_USERNAME/csv-importer/workflows/CI/badge.svg)](https://github.com/rnwbllabs/csv-importer/actions)
+[![CI Status](https://github.com/rnwbllabs/csv-importer/workflows/CI/badge.svg)](https://github.com/rnwbllabs/csv-importer/actions)
 [![Gem Version](https://badge.fury.io/rb/csv-importer.svg)](http://badge.fury.io/rb/csv-importer)
 
 ## Rationale
