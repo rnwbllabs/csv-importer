@@ -7,10 +7,10 @@ require "csv_importer/version"
 Gem::Specification.new do |spec|
   spec.name = "csv-importer"
   spec.version = CSVImporter::VERSION
-  spec.authors = ["Philippe Creux"]
+  spec.authors = ["Philippe Creux", "Marcus Deans"]
   spec.email = ["pcreux@gmail.com"]
 
-  spec.summary = "CSV Import for humans"
+  spec.summary = "CSV Import for Humans"
   spec.homepage = "https://github.com/rnwbllabs/csv-importer"
   spec.license = "MIT"
 
