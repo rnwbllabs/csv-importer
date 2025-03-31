@@ -36,5 +36,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "standard-sorbet", "~> 0.0.2"
   spec.add_development_dependency "tapioca", "~> 0.11"
 
-  spec.required_ruby_version = ">= 3.0"
+  spec.required_ruby_version = ">= 3.2"
 end
