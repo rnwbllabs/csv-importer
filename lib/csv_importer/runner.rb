@@ -166,7 +166,7 @@ module CSVImporter
     def transaction(&block)
       raise "No rows to process" if rows.empty?
 
-      T.must(rows.first).model.class.transaction(&block)
+      T.must(rows.first).model_klass.transaction(&block)
     end
   end
 end

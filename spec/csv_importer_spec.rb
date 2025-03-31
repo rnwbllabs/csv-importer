@@ -835,4 +835,101 @@ second@example.com,second,user"
       expect(jane.email).to eq("jane@example.org")
     end
   end
+
+  describe "custom error handling" do
+    class ImportUserWithCustomErrors
+      include CSVImporter
+
+      model User
+
+      column :email, required: true
+      column :first_name, to: :f_name, required: true
+      column :last_name, to: :l_name
+      column :age, virtual: true
+
+      after_build do |user|
+        # Add custom error for a CSV column
+        if csv_attributes["age"] && csv_attributes["age"].to_i < 18
+          add_error("age", "Must be 18 or older")
+        end
+
+        # Add error for a model attribute
+        if user.email && user.email.end_with?("@gmail.com")
+          add_model_error(:email, "Gmail addresses are not accepted")
+        end
+
+        # Add a general error not tied to any column
+        if user.f_name == "bad" && user.l_name == "person"
+          add_general_error("This person is not allowed")
+        end
+      end
+    end
+
+    it "skips rows with custom errors" do
+      csv_content = "email,first_name,last_name,age
+valid@example.com,john,doe,25
+young@example.com,jane,smith,16
+bad@gmail.com,bob,jones,30
+bad@example.com,bad,person,40"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Check report stats
+      expect(import.report.valid_rows.size).to eq(1)
+      expect(import.report.created_rows.size).to eq(1)
+      expect(import.report.create_skipped_rows.size).to eq(3)
+
+      # Verify only the valid record was created
+      expect(User.find_by(email: "valid@example.com")).to be_present
+      expect(User.find_by(email: "young@example.com")).to be_nil
+      expect(User.find_by(email: "bad@gmail.com")).to be_nil
+      expect(User.find_by(email: "bad@example.com")).to be_nil
+    end
+
+    it "includes custom errors in the error messages" do
+      csv_content = "email,first_name,last_name,age
+young@example.com,jane,smith,16"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Find the skipped row
+      row = import.report.create_skipped_rows.first
+
+      # Check that the error is associated with the correct column
+      expect(row.errors).to include("age")
+      expect(row.errors["age"]).to eq("Must be 18 or older")
+    end
+
+    it "maps model attribute errors to CSV columns" do
+      csv_content = "email,first_name,last_name,age
+bad@gmail.com,bob,jones,30"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Find the skipped row
+      row = import.report.create_skipped_rows.first
+
+      # Check that the error is associated with the email column
+      expect(row.errors).to include("email")
+      expect(row.errors["email"]).to eq("Gmail addresses are not accepted")
+    end
+
+    it "handles general errors not tied to columns" do
+      csv_content = "email,first_name,last_name,age
+bad@example.com,bad,person,40"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Find the skipped row
+      row = import.report.create_skipped_rows.first
+
+      # Check that the general error is included
+      expect(row.errors).to include("_general")
+      expect(row.errors["_general"]).to eq("This person is not allowed")
+    end
+  end
 end
