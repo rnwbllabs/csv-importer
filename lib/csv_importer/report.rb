@@ -11,6 +11,7 @@ module CSVImporter
   # * Successfully created or updated records
   # * Failed import attempts
   # * Records skipped during import
+  # * Preview mode flag (when validation only is performed)
   class Report
     extend T::Sig
 
@@ -36,6 +37,11 @@ module CSVImporter
     # @return [String, nil] Error message from the CSV parser if parsing failed
     sig { returns(T.nilable(String)) }
     attr_accessor :parser_error
+
+    # @!attribute [r] preview_mode
+    # @return [Boolean] Whether this report was generated in preview mode
+    sig { returns(T::Boolean) }
+    attr_accessor :preview_mode
 
     # @!attribute [r] created_rows
     # @return [Array<Row>] Rows that were successfully created in the database
@@ -77,6 +83,7 @@ module CSVImporter
     # @param missing_columns [Array<String>] Columns required but missing
     # @param extra_columns [Array<String>] Columns present but not used
     # @param parser_error [String, nil] Error message from CSV parser
+    # @param preview_mode [Boolean] Whether this report was generated in preview mode
     # @param created_rows [Array<Row>] Rows successfully created
     # @param updated_rows [Array<Row>] Rows successfully updated
     # @param failed_to_create_rows [Array<Row>] Rows that failed to create
@@ -90,6 +97,7 @@ module CSVImporter
         missing_columns: T::Array[String],
         extra_columns: T::Array[String],
         parser_error: T.nilable(String),
+        preview_mode: T::Boolean,
         created_rows: T::Array[Row],
         updated_rows: T::Array[Row],
         failed_to_create_rows: T::Array[Row],
@@ -99,13 +107,14 @@ module CSVImporter
         message_generator: T.class_of(ReportMessage)
       ).void
     end
-    def initialize(status: :pending, missing_columns: [], extra_columns: [], parser_error: nil, created_rows: [],
+    def initialize(status: :pending, missing_columns: [], extra_columns: [], parser_error: nil, preview_mode: false, created_rows: [],
       updated_rows: [], failed_to_create_rows: [], failed_to_update_rows: [], create_skipped_rows: [],
       update_skipped_rows: [], message_generator: ReportMessage)
       @status = T.let(status, Symbol)
       @missing_columns = T.let(missing_columns, T::Array[String])
       @extra_columns = T.let(extra_columns, T::Array[String])
       @parser_error = T.let(parser_error, T.nilable(String))
+      @preview_mode = T.let(preview_mode, T::Boolean)
       @created_rows = T.let(created_rows, T::Array[Row])
       @updated_rows = T.let(updated_rows, T::Array[Row])
       @failed_to_create_rows = T.let(failed_to_create_rows, T::Array[Row])
@@ -124,6 +133,7 @@ module CSVImporter
         missing_columns: missing_columns,
         extra_columns: extra_columns,
         parser_error: parser_error,
+        preview_mode: preview_mode,
         created_rows: created_rows,
         updated_rows: updated_rows,
         failed_to_create_rows: failed_to_create_rows,
@@ -257,6 +267,13 @@ module CSVImporter
     sig { returns(String) }
     def message
       message_generator.call(self)
+    end
+
+    # Indicates if the report was generated in preview mode
+    # @return [Boolean] true if the report was generated in preview mode
+    sig { returns(T::Boolean) }
+    def preview?
+      preview_mode
     end
   end
 end

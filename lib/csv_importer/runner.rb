@@ -27,6 +27,12 @@ module CSVImporter
     sig { returns(Symbol) }
     attr_accessor :when_invalid
 
+    # Whether to run in preview mode (validate only, no persistence)
+    # @!attribute [rw] preview_mode
+    # @return [Boolean] whether to run in preview mode
+    sig { returns(T::Boolean) }
+    attr_accessor :preview_mode
+
     # Blocks to be called after each row is saved
     # @!attribute [rw] after_save_blocks
     # @return [Array<Proc>] blocks to be called after each row is saved
@@ -42,6 +48,7 @@ module CSVImporter
     # Initialize a new Runner with the provided options.
     # @param rows [Array<Row>] the rows to be imported
     # @param when_invalid [Symbol] the strategy to use when a row is invalid
+    # @param preview_mode [Boolean] whether to run in preview mode (validate only)
     # @param after_save_blocks [Array<Proc>] blocks to be called after each row is saved
     # @param report [Report] the report to update with import results
     # @return [void]
@@ -49,13 +56,15 @@ module CSVImporter
       params(
         rows: T::Array[Row],
         when_invalid: Symbol,
+        preview_mode: T::Boolean,
         after_save_blocks: T::Array[Proc],
         report: Report
       ).void
     end
-    def initialize(rows:, when_invalid:, after_save_blocks: [], report: Report.new)
+    def initialize(rows:, when_invalid:, preview_mode: false, after_save_blocks: [], report: Report.new)
       @rows = rows
       @when_invalid = when_invalid
+      @preview_mode = preview_mode
       @after_save_blocks = after_save_blocks
       @report = report
     end
@@ -71,6 +80,8 @@ module CSVImporter
         report.done!
         return report
       end
+
+      report.preview_mode = preview_mode
 
       report.in_progress!
 
@@ -100,31 +111,56 @@ module CSVImporter
         rows.each do |row|
           tags = []
 
-          tags << if row.model.persisted?
-            :update
-          else
-            :create
-          end
+          # First tag: create or update based on whether the record exists
+          tags << (row.model.persisted? ? :update : :create)
 
-          tags << if row.skip?
-            :skip
-          elsif row.model.save
-            :success
-          else
-            :failure
-          end
+          # Second tag: determine success, failure, or skip status
+          status_tag = determine_status_tag(row)
+          tags << status_tag
 
           add_to_report(row, tags)
 
-          after_save_blocks.each do |block|
-            case block.arity
-            when 0 then block.call
-            when 1 then block.call(row.model)
-            when 2 then block.call(row.model, row.csv_attributes)
-            else
-              raise ArgumentError, "after_save block of arity #{block.arity} is not supported"
-            end
-          end
+          # Only run after_save hooks if not in preview mode
+          next if preview_mode
+
+          run_after_save_hooks(row)
+        end
+      end
+    end
+
+    # Determine the status tag (:success, :failure, or :skip) for a row
+    # @param row [Row] the row to determine the status for
+    # @return [Symbol] the status tag
+    sig { params(row: Row).returns(Symbol) }
+    def determine_status_tag(row)
+      return :skip if row.skip?
+
+      # Validation check first - no need to attempt saving invalid models
+      if !row.valid?
+        return :failure
+      end
+
+      if preview_mode
+        # In preview mode, just mark as success for valid models
+        :success
+      else
+        # In normal mode, attempt to save and check result
+        row.model.save ? :success : :failure
+      end
+    end
+
+    # Run all after_save hooks for a row
+    # @param row [Row] the row to run after_save hooks for
+    # @return [void]
+    sig { params(row: Row).void }
+    def run_after_save_hooks(row)
+      after_save_blocks.each do |block|
+        case block.arity
+        when 0 then block.call
+        when 1 then block.call(row.model)
+        when 2 then block.call(row.model, row.csv_attributes)
+        else
+          raise ArgumentError, "after_save block of arity #{block.arity} is not supported"
         end
       end
     end

@@ -181,6 +181,9 @@ module CSVImporter
   # @return [Report] the report for the import
   sig { returns(Report) }
   def run!
+    # Always create a fresh report when starting an import run
+    @report = Report.new
+
     if valid_header?
       config.before_import_blocks.each do |block|
         case block.arity
@@ -190,11 +193,27 @@ module CSVImporter
       end
 
       @report = Runner.call(rows: rows, when_invalid: config.when_invalid,
-        after_save_blocks: config.after_save_blocks, report: @report)
+        after_save_blocks: config.after_save_blocks, preview_mode: config.preview_mode, report: @report)
     else
       @report
     end
   rescue CSV::MalformedCSVError => e
     @report = Report.new(status: :invalid_csv_file, parser_error: e.message)
+  end
+
+  # Run the import in preview mode to validate data without persisting changes.
+  # This processes all rows, runs validations, and reports errors, but does not save any records.
+  # @return [Report] the report with validation results
+  sig { returns(Report) }
+  def preview!
+    previous_mode = config.preview_mode
+    config.preview_mode = true
+
+    result = run!
+
+    # Restore the previous mode in case the instance is reused
+    config.preview_mode = previous_mode
+
+    result
   end
 end

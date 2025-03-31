@@ -25,6 +25,12 @@ module CSVImporter
     sig { returns(Symbol) }
     attr_accessor :when_invalid
 
+    # Whether to run in preview mode (validate only, no persistence)
+    # @!attribute [rw] preview_mode
+    # @return [Boolean] whether to run in preview mode
+    sig { returns(T::Boolean) }
+    attr_accessor :preview_mode
+
     # The column definitions for the model
     # @!attribute [rw] column_definitions
     # @return [T::Array[ColumnDefinition]] the column definitions for the model
@@ -57,6 +63,7 @@ module CSVImporter
       @after_build_blocks = T.let([], T::Array[Proc])
       @after_save_blocks = T.let([], T::Array[Proc])
       @when_invalid = T.let(:skip, Symbol)
+      @preview_mode = T.let(false, T::Boolean)
     end
 
     # Add a block to run before the import is run
