@@ -281,6 +281,39 @@ Or a Proc:
   identifier ->(user) { user.email.empty? ? [:company_id, :employee_id] : :email }
 ```
 
+### Multi-Model Import
+
+You can import CSV data that maps to multiple related models in a single row.
+
+```ruby
+class ImportTimeCardCSV
+  include CSVImporter
+
+  # Define multiple models
+  models user: User, time_card: TimeCard
+
+  # Define persistence order
+  persist_order [:user, :time_card]
+
+  # Define identifiers for each model
+  model_identifier :user, :email
+  model_identifier :time_card, [:user_id, :date]
+
+  # Map columns to specific models
+  column :email, required: true, model: :user
+  column :first_name, model: :user
+  column :date, required: true, model: :time_card
+  column :hours_worked, model: :time_card
+
+  # Set up relationships between models
+  after_build do
+    time_card.user = user
+  end
+end
+```
+
+See the [Multi-Model Import Guide](docs/multi_model_guide.md) for more details.
+
 ### Skip or Abort on error
 
 By default, we skip invalid records and report errors back to the user.

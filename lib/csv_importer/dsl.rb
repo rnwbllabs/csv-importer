@@ -14,6 +14,24 @@ module CSVImporter
     # @param model_klass [Class] the model to which imported data will be mapped
     def model(model_klass)
       config.model = model_klass
+      # For backward compatibility, also populate the models hash
+      config.models[:_default] = model_klass
+    end
+
+    # Set multiple models for mapping CSV columns to different model types
+    # @param models [Hash<Symbol, Class>] a hash mapping model keys to model classes
+    # @example
+    #   models user: User, time_card: TimeCard
+    def models(models)
+      config.models = models
+    end
+
+    # Set the order in which models should be persisted
+    # @param order [Array<Symbol>] the order in which models should be persisted
+    # @example
+    #   persist_order [:user, :time_card]
+    def persist_order(order)
+      config.persist_order = order
     end
 
     # Define a column for the model
@@ -26,6 +44,8 @@ module CSVImporter
     #   the column is not present in the CSV file. Defaults to false.
     # @param virtual [Boolean] [Optional] whether the column is virtual, i.e., not present on the associated model and
     #   won't be set on the model at all. Defaults to false.
+    # @param model [Symbol] [Optional] the key of the model this column belongs to. If not specified, the column
+    #   will be mapped to the default model.
     # @param options [Hash] the options for the column
     sig do
       params(
@@ -33,12 +53,13 @@ module CSVImporter
         to: CSVImporter::ColumnDefinition::ToType,
         as: CSVImporter::ColumnDefinition::AsType,
         required: T.nilable(T::Boolean),
-        virtual: T.nilable(T::Boolean)
+        virtual: T.nilable(T::Boolean),
+        model: T.nilable(Symbol)
       ).void
     end
-    def column(name, to: nil, as: nil, required: false, virtual: false)
+    def column(name, to: nil, as: nil, required: false, virtual: false, model: nil)
       column_definition = ColumnDefinition.new(
-        name:, to:, as:, required: required || false, virtual: virtual || false
+        name:, to:, as:, required: required || false, virtual: virtual || false, model: model
       )
       config.column_definitions << column_definition
     end
@@ -50,6 +71,15 @@ module CSVImporter
     end
 
     alias_method :identifiers, :identifier
+
+    # Define the identifiers for a specific model, used to uniquely identify a record for finding or creating it
+    # @param model_key [Symbol] the key of the model these identifiers are for
+    # @param params [Symbol, Array, Proc] the identifiers for the model
+    def model_identifier(model_key, *params)
+      config.model_identifiers[model_key] = params.first.is_a?(Proc) ? params.first : params
+    end
+
+    alias_method :model_identifiers, :model_identifier
 
     # Action to take when a record is invalid
     # @param action [Symbol] the action to take when a record is invalid

@@ -852,17 +852,17 @@ second@example.com,second,user"
       after_build do |user|
         # Add custom error for a CSV column
         if csv_attributes["age"] && csv_attributes["age"].to_i < 18
-          add_error("age", "Must be 18 or older")
+          add_error("Must be 18 or older", column_name: "age")
         end
 
         # Add error for a model attribute
         if user&.email&.end_with?("@gmail.com")
-          add_model_error(:email, "Gmail addresses are not accepted")
+          add_error("Gmail addresses are not accepted", column_name: "email")
         end
 
         # Add a general error not tied to any column
         if user.f_name == "bad" && user.l_name == "person"
-          add_general_error("This person is not allowed")
+          add_error("This person is not allowed", column_name: "_general")
         end
       end
     end
@@ -989,7 +989,7 @@ bob@example.com,bob,example"
 
         after_build do |user|
           if user.f_name == "invalid"
-            add_error("first_name", "First name cannot be 'invalid'")
+            add_error("First name cannot be 'invalid'", column_name: "first_name")
           end
         end
       end

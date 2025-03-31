@@ -30,6 +30,25 @@ require "csv_importer/dsl"
 #
 #   report = ImportUserCSV.new(file: my_csv).run!
 #   puts report.message
+#
+# @example with multiple models:
+#   class ImportTimeCardCSV
+#     include CSVImporter
+#
+#     models user: User, time_card: TimeCard
+#     persist_order [:user, :time_card]
+#
+#     model_identifier :user, :email
+#     model_identifier :time_card, :user_id, :date
+#
+#     column :email, model: :user
+#     column :first_name, model: :user
+#     column :hours_worked, model: :time_card
+#     column :date, model: :time_card
+#   end
+#
+#   report = ImportTimeCardCSV.new(file: my_csv).run!
+#   puts report.message
 module CSVImporter
   extend T::Sig
   extend T::Helpers
@@ -154,8 +173,29 @@ module CSVImporter
   sig { returns(T::Array[Row]) }
   def rows
     csv.rows.map.with_index(2) do |row_array, line_number|
-      Row.new(header: header, line_number: line_number, row_array: row_array, model_klass: config.model,
-        identifiers: config.identifiers, after_build_blocks: config.after_build_blocks, datastore: datastore)
+      # Prepare models hash - if legacy model exists but models is empty, map it to _default
+      models_hash = config.models.dup
+      if models_hash.empty? && config.model
+        models_hash[:_default] = config.model
+      end
+
+      # Prepare model_identifiers - if legacy identifiers exist, map them to _default
+      model_identifiers = config.model_identifiers.dup
+      if config.identifiers && !model_identifiers.key?(:_default)
+        model_identifiers[:_default] = config.identifiers
+      end
+
+      # Create the row with all necessary parameters
+      Row.new(
+        header: header,
+        line_number: line_number,
+        row_array: row_array,
+        models: models_hash,
+        persist_order: config.persist_order,
+        model_identifiers: model_identifiers,
+        after_build_blocks: config.after_build_blocks,
+        datastore: datastore
+      )
     end
   end
 

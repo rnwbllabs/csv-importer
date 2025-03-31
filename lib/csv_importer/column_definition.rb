@@ -29,6 +29,14 @@ module CSVImporter
   #   column :confirmed, to: ->(confirmed, model) do
   #     model.confirmed_at = confirmed == "true" ? Time.new(2012) : nil
   #   end
+  #
+  # @example map email column to the user model
+  #
+  #   column :email, model: :user
+  #
+  # @example map hours_worked column to the time_card model
+  #
+  #   column :hours_worked, model: :time_card
   class ColumnDefinition
     extend T::Sig
 
@@ -63,6 +71,11 @@ module CSVImporter
     sig { returns(T::Boolean) }
     attr_accessor :virtual
 
+    # @!attribute [rw] model_key
+    # @return [Symbol, nil] the key of the model this column belongs to
+    sig { returns(T.nilable(Symbol)) }
+    attr_accessor :model_key
+
     # Initialize a new column definition
     # @param name [Symbol, String, nil] the name of the column in the CSV file
     # @param to [Symbol, Proc, nil] the attribute on the model that will be set with the value of the column. If nil,
@@ -70,21 +83,24 @@ module CSVImporter
     # @param as [Symbol, String, Regexp, Array, nil] more complex matching logic for the name of the column in the CSV file.
     #   If nil, the name of the column in the CSV file will be used.
     # @param required [Boolean] whether the column is required
+    # @param model [Symbol, nil] the key of the model this column belongs to
     sig do
       params(
         name: T.nilable(T.any(String, Symbol)),
         to: ToType,
         as: AsType,
         required: T::Boolean,
-        virtual: T::Boolean
+        virtual: T::Boolean,
+        model: T.nilable(Symbol)
       ).void
     end
-    def initialize(name: nil, to: nil, as: nil, required: false, virtual: false)
+    def initialize(name: nil, to: nil, as: nil, required: false, virtual: false, model: nil)
       @name = name
       @to = to
       @as = as
       @required = required
       @virtual = virtual
+      @model_key = model
     end
 
     # Whether the column is required, i.e., the model will raise an error if the column is not present in the CSV file.

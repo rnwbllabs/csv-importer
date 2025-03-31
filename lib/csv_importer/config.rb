@@ -13,6 +13,25 @@ module CSVImporter
     sig { returns(T.nilable(T.any(T::Class[T.anything], T.untyped))) }
     attr_accessor :model
 
+    # Multiple models for mapping CSV columns to different model types
+    # Can be ActiveRecord classes, scopes, or associations
+    # @!attribute [rw] models
+    # @return [T::Hash[Symbol, T.any(T::Class[T.anything], T.untyped)]] mapping of model keys to model classes
+    sig { returns(T::Hash[Symbol, T.any(T::Class[T.anything], T.untyped)]) }
+    attr_accessor :models
+
+    # Order in which models should be persisted
+    # @!attribute [rw] persist_order
+    # @return [T::Array[Symbol]] ordered list of model keys defining persistence order
+    sig { returns(T::Array[Symbol]) }
+    attr_accessor :persist_order
+
+    # Identifiers for each model, used to uniquely identify records for finding or creating
+    # @!attribute [rw] model_identifiers
+    # @return [T::Hash[Symbol, T.any(T::Array[Symbol], Proc)]] mapping of model keys to their identifiers
+    sig { returns(T::Hash[Symbol, T.any(T::Array[Symbol], Proc)]) }
+    attr_accessor :model_identifiers
+
     # The identifiers for the model, used to uniquely identify a record for finding or creating it
     # @!attribute [rw] identifiers
     # @return [T.nilable(T.any(T::Array[Symbol], Proc))] the identifiers for the model
@@ -64,6 +83,9 @@ module CSVImporter
       @after_save_blocks = T.let([], T::Array[Proc])
       @when_invalid = T.let(:skip, Symbol)
       @preview_mode = T.let(false, T::Boolean)
+      @models = T.let({}, T::Hash[Symbol, T.any(T::Class[T.anything], T.untyped)])
+      @persist_order = T.let([], T::Array[Symbol])
+      @model_identifiers = T.let({}, T::Hash[Symbol, T.any(T::Array[Symbol], Proc)])
     end
 
     # Add a block to run before the import is run
@@ -100,6 +122,9 @@ module CSVImporter
       @identifiers = orig.identifiers.dup if orig.identifiers
       @after_save_blocks = orig.after_save_blocks.dup
       @after_build_blocks = orig.after_build_blocks.dup
+      @models = orig.models.dup
+      @persist_order = orig.persist_order.dup
+      @model_identifiers = orig.model_identifiers.dup
     end
   end
 end

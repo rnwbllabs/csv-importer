@@ -109,89 +109,199 @@ module CSVImporter
     def persist_rows!
       transaction do
         rows.each do |row|
-          tags = []
-
-          # First tag: create or update based on whether the record exists
-          tags << (row.model.persisted? ? :update : :create)
-
-          # Second tag: determine success, failure, or skip status
-          status_tag = determine_status_tag(row)
-          tags << status_tag
-
-          add_to_report(row, tags)
-
-          # Only run after_save hooks if not in preview mode
-          next if preview_mode
-
-          run_after_save_hooks(row)
+          process_row(row)
         end
       end
     end
 
-    # Determine the status tag (:success, :failure, or :skip) for a row
-    # @param row [Row] the row to determine the status for
-    # @return [Symbol] the status tag
-    sig { params(row: Row).returns(Symbol) }
-    def determine_status_tag(row)
-      return :skip if row.skip?
+    # Process a single row
+    # @param row [Row] the row to process
+    # @return [void]
+    sig { params(row: Row).void }
+    def process_row(row)
+      # Skip processing if row is marked to skip
+      return if row.skip?
 
-      # Validation check first - no need to attempt saving invalid models
-      if !row.valid?
-        return :failure
+      # Check if the row is valid before attempting to save
+      unless row.valid?
+        add_row_to_report(row, :failure)
+        raise ImportAborted if abort_when_invalid?
+        return
       end
 
       if preview_mode
         # In preview mode, just mark as success for valid models
-        :success
+        add_row_to_report(row, :success)
       else
-        # In normal mode, attempt to save and check result
-        row.model.save ? :success : :failure
+        # In normal mode, persist the models in the specified order
+        save_models_for_row(row)
       end
+
+      # Only run after_save hooks if not in preview mode
+      return if preview_mode
+
+      run_after_save_hooks(row)
     end
 
-    # Run all after_save hooks for a row
-    # @param row [Row] the row to run after_save hooks for
+    # Save all models for a row in the specified order
+    # @param row [Row] the row containing models to save
     # @return [void]
     sig { params(row: Row).void }
-    def run_after_save_hooks(row)
-      after_save_blocks.each do |block|
-        case block.arity
-        when 0 then block.call
-        when 1 then block.call(row.model)
-        when 2 then block.call(row.model, row.csv_attributes)
+    def save_models_for_row(row)
+      # Get the models to persist in the correct order
+      models_list = get_models_to_persist(row)
+      success = persist_models_in_order(row, models_list)
+
+      # Report final status
+      add_row_to_report(row, success ? :success : :failure)
+    end
+
+    # Get the list of models to persist in the correct order
+    # @param row [Row] the row containing models
+    # @return [Array<Array>] list of [model_key, model] pairs
+    sig { params(row: Row).returns(T::Array[T::Array[T.untyped]]) }
+    def get_models_to_persist(row)
+      # Get the persist order, or use all model keys if empty
+      persist_order = row.persist_order.dup
+      if persist_order.empty?
+        persist_order = row.models.keys.to_a
+      end
+
+      # Build list of models to persist
+      models_list = []
+      persist_order.each do |model_key|
+        next unless row.built_models.key?(model_key)
+        models_list << [model_key, row.built_models[model_key]]
+      end
+
+      models_list
+    end
+
+    # Persist models in the given order
+    # @param row [Row] the row containing models
+    # @param models_list [Array<Array>] list of [model_key, model] pairs
+    # @return [Boolean] whether all models were saved successfully
+    sig { params(row: Row, models_list: T::Array[T::Array[T.untyped]]).returns(T::Boolean) }
+    def persist_models_in_order(row, models_list)
+      # Use a method to process each model and return a boolean status
+      process_all_models(row, models_list)
+    end
+
+    # Process all models and return success status
+    # @param row [Row] the row containing models
+    # @param models_list [Array<Array>] list of [model_key, model] pairs
+    # @return [Boolean] whether all models were saved successfully
+    sig { params(row: Row, models_list: T::Array[T::Array[T.untyped]]).returns(T::Boolean) }
+    def process_all_models(row, models_list)
+      # Process models in a separate method that returns true if all saved
+      all_models_saved?(row, models_list)
+    end
+
+    # Check if all models saved successfully
+    # @param row [Row] the row containing models
+    # @param models_list [Array<Array>] list of [model_key, model] pairs
+    # @return [Boolean] true if all models saved successfully
+    sig { params(row: Row, models_list: T::Array[T::Array[T.untyped]]).returns(T::Boolean) }
+    def all_models_saved?(row, models_list)
+      # Check each model and return false at first failure
+      models_list.each do |model_info|
+        model_key, model = model_info
+
+        # Skip if either key or model is nil
+        next unless model_key && model
+
+        # Skip if model doesn't respond to save
+        next unless model.respond_to?(:save)
+
+        # If any model fails to save, return false immediately
+        unless process_single_model(row, model)
+          return false
+        end
+      end
+
+      # If we get here, all models saved successfully
+      true
+    end
+
+    # Process a single model and handle any failures
+    # @param row [Row] the row containing the model
+    # @param model [Object] the model to save
+    # @return [Boolean] whether the model was saved successfully
+    sig { params(row: Row, model: T.untyped).returns(T::Boolean) }
+    def process_single_model(row, model)
+      # Try to save the model
+      saved = model.save
+
+      # If save failed, handle according to configuration
+      if !saved && abort_when_invalid?
+        add_row_to_report(row, :failure)
+        raise ImportAborted
+      end
+
+      saved
+    end
+
+    # Add a row to the report based on its status
+    # @param row [Row] the row to add to the report
+    # @param status [Symbol] the status of the row (:success or :failure)
+    # @return [void]
+    sig { params(row: Row, status: Symbol).void }
+    def add_row_to_report(row, status)
+      # Get the model for the report (for backward compatibility use :_default or first model)
+      first_model = row.built_models[:_default] || row.built_models.values.first
+
+      # Determine if this is a create or update operation
+      persisted = false
+      if first_model
+        persisted = first_model.persisted?
+      end
+
+      # Add the row to the appropriate bucket based on status and persistence
+      if status == :success
+        if persisted
+          report.updated_rows << row
         else
-          raise ArgumentError, "after_save block of arity #{block.arity} is not supported"
+          report.created_rows << row
+        end
+      elsif status == :failure
+        if persisted
+          report.failed_to_update_rows << row
+        else
+          report.failed_to_create_rows << row
+        end
+      else # skip
+        if persisted
+          report.update_skipped_rows << row
+        else
+          report.create_skipped_rows << row
         end
       end
     end
 
-    # Add a row to the appropriate report bucket based on its tags
-    # @param row [Row] the row to add to the report
-    # @param tags [Array<Symbol>] the tags associated with the row
+    # Run after_save hooks for all models in a row
+    # @param row [Row] the row whose models to run after_save hooks for
     # @return [void]
-    # @raise [ImportAborted] if the import should be aborted due to a failed row
-    sig { params(row: Row, tags: T::Array[Symbol]).void }
-    def add_to_report(row, tags)
-      bucket = case tags
-      when %i[create success]
-        report.created_rows
-      when %i[create failure]
-        report.failed_to_create_rows
-      when %i[update success]
-        report.updated_rows
-      when %i[update failure]
-        report.failed_to_update_rows
-      when %i[create skip]
-        report.create_skipped_rows
-      when %i[update skip]
-        report.update_skipped_rows
-      else
-        raise "Invalid tags #{tags.inspect}"
+    sig { params(row: Row).void }
+    def run_after_save_hooks(row)
+      after_save_blocks.each do |block|
+        # For backward compatibility, support both old style (passing single model)
+        # and new style (passing row)
+        arity = block.arity
+
+        if arity == 1
+          # For backwards compatibility with single model
+          block.call(row.model)
+        elsif arity == 0
+          # For new style with row
+          block.call
+        elsif arity == 2
+          # Support legacy three-argument style (model, csv_attributes)
+          block.call(row.model, row.csv_attributes)
+        else
+          # Just call with row if we can't determine the proper arity
+          block.call(row)
+        end
       end
-
-      bucket << row
-
-      raise ImportAborted if abort_when_invalid? && tags[1] == :failure
     end
 
     # Run the code in a transaction using the model's class
@@ -202,7 +312,52 @@ module CSVImporter
     def transaction(&block)
       raise "No rows to process" if rows.empty?
 
-      T.must(rows.first).model_klass.transaction(&block)
+      # Use the first row's model class for the transaction
+      first_row = T.must(rows.first)
+
+      # Find a suitable model class to use for the transaction
+      transaction_class = nil
+
+      # First check persist_order for the preferred model
+      if !first_row.persist_order.empty?
+        persist_key = first_row.persist_order.first
+        if persist_key && first_row.models.key?(persist_key)
+          transaction_class = first_row.models[persist_key]
+        end
+      end
+
+      # If we still don't have a class, try the models hash
+      if transaction_class.nil? && !first_row.models.empty?
+        # Use the :_default model if it exists (legacy single-model case)
+        if first_row.models.key?(:_default)
+          transaction_class = first_row.models[:_default]
+        else
+          # Otherwise use the first model in the hash
+          first_key = first_row.models.keys.first
+          if first_key
+            transaction_class = first_row.models[first_key]
+          end
+        end
+      end
+
+      # If we found a class, use it for the transaction
+      if transaction_class
+        transaction_class.transaction(&block)
+      else
+        # Fallback to built_models if available
+        if !first_row.built_models.empty?
+          first_model = first_row.built_models.values.first
+          if first_model && first_model.class.respond_to?(:transaction)
+            first_model.class.transaction(&block)
+          else
+            # Last resort - just execute the block without a transaction
+            yield
+          end
+        else
+          # Last resort - just execute the block without a transaction
+          yield
+        end
+      end
     end
   end
 end
