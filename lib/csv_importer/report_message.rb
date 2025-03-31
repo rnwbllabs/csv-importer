@@ -54,7 +54,8 @@ module CSVImporter
     # @return [String] the done report message
     sig { returns(String) }
     def report_done
-      "Import completed: " + import_details
+      prefix = report.preview? ? "Preview completed" : "Import completed"
+      "#{prefix}: #{import_details}"
     end
 
     # Invalid header report message
@@ -75,7 +76,7 @@ module CSVImporter
     # @return [String] the aborted report message
     sig { returns(String) }
     def report_aborted
-      "Import aborted"
+      report.preview? ? "Preview aborted" : "Import aborted"
     end
 
     # Message for details of import

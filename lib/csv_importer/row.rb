@@ -10,6 +10,20 @@ module CSVImporter
   class Row
     extend T::Sig
 
+    # CustomError is used to track errors that are not tied to a specific column
+    # It can be used to track errors that are tied to a model attribute or a general error
+    # @!attribute [rw] message
+    # @return [String] The error message
+    # @!attribute [rw] column_name
+    # @return [String, nil] The name of the column that the error is tied to
+    # @!attribute [rw] attribute
+    # @return [Symbol, nil] The name of the model attribute that the error is tied to
+    class CustomError < T::Struct
+      const :message, String
+      const :column_name, T.nilable(String)
+      const :attribute, T.nilable(Symbol)
+    end
+
     # @!attribute [rw] header
     # @return [Header, nil] the header of the row
     sig { returns(T.nilable(Header)) }
@@ -50,6 +64,16 @@ module CSVImporter
     sig { returns(T::Hash[Symbol, T.anything]) }
     attr_reader :datastore
 
+    # @!attribute [r] custom_errors
+    # @return [Array<CustomError>] Array of custom errors
+    sig { returns(T::Array[CustomError]) }
+    attr_reader :custom_errors
+
+    # @!attribute [r] valid
+    # @return [Boolean, nil] Whether this row is valid (true if no model errors or custom errors)
+    sig { returns(T.nilable(T::Boolean)) }
+    attr_reader :valid
+
     # Initialize a new Row
     # @param line_number [Integer] The line number in the CSV file
     # @param header [Header, nil] The CSV header
@@ -83,6 +107,8 @@ module CSVImporter
       @model = T.let(nil, T.untyped)
       @csv_attributes = T.let(nil, T.nilable(T::Hash[T.any(String, Symbol), T.nilable(String)]))
       @datastore = T.let(datastore, T::Hash[Symbol, T.anything])
+      @custom_errors = T.let([], T::Array[CustomError])
+      @valid = T.let(nil, T.nilable(T::Boolean))
     end
 
     # Check if this row should be skipped
@@ -182,17 +208,91 @@ module CSVImporter
       model
     end
 
+    # Add error for a specific CSV column
+    # @param column_name [String, Symbol] Name of the CSV column
+    # @param message [String] Error message
+    # @return [self] Self for method chaining
+    sig { params(column_name: T.any(String, Symbol), message: String).returns(T.self_type) }
+    def add_error(column_name, message)
+      @custom_errors << CustomError.new(
+        message: message,
+        column_name: column_name.to_s
+      )
+      skip!
+      self
+    end
+
+    # Add error for a model attribute
+    # @param attribute [Symbol] Model attribute name
+    # @param message [String] Error message
+    # @return [self] Self for method chaining
+    sig { params(attribute: Symbol, message: String).returns(T.self_type) }
+    def add_model_error(attribute, message)
+      # Don't call model() here to avoid recursion - use @model if already built
+      if @model
+        @model.errors.add(attribute, message)
+      else
+        # Store it in custom errors if model isn't built yet
+        @custom_errors << CustomError.new(message:, attribute:)
+      end
+      skip!
+      self
+    end
+
+    # Add a general error not tied to any specific column
+    # @param message [String] Error message
+    # @return [self] Self for method chaining
+    sig { params(message: String).returns(T.self_type) }
+    def add_general_error(message)
+      @custom_errors << CustomError.new(
+        message: message
+      )
+      skip!
+      self
+    end
+
+    # Check if this row is valid
+    # @return [Boolean] true if the row is valid
+    sig { returns(T::Boolean) }
+    def valid?
+      # Custom errors always make the row invalid
+      return false if custom_errors.any?
+
+      # Use cached validation result if available
+      @valid = model.valid? if @valid.nil?
+      @valid
+    end
+
     # Error from the model mapped back to the CSV header if we can
     # @return [Hash] Errors mapped to CSV column names where possible
+    # @note Includes custom errors if available
     sig { returns(T::Hash[T.any(String, Symbol), T.nilable(String)]) }
     def errors
-      model.errors.to_hash.map do |attribute, errors|
+      # Get model errors mapped to column names when possible
+      model_errors = model.errors.to_hash.map do |attribute, errors|
         if header && (column_name = T.must(header).column_name_for_model_attribute(attribute))
           [column_name, errors.last]
         else
           [attribute, errors.last]
         end
       end.to_h
+
+      custom_errors.each do |error|
+        # If error has a column_name, use it directly
+        key = if error.column_name
+          error.column_name
+        # If error has an attribute but no column_name, try to map it to CSV column
+        elsif (attribute = error.attribute) && header
+          T.must(header).column_name_for_model_attribute(attribute) || attribute
+        # Otherwise use a general key
+        else
+          "_general"
+        end
+
+        model_errors[key] = error.message
+      end
+
+      model_errors
     end
 
     # Find an existing record or build a new one

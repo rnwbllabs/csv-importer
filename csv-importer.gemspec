@@ -7,10 +7,10 @@ require "csv_importer/version"
 Gem::Specification.new do |spec|
   spec.name = "csv-importer"
   spec.version = CSVImporter::VERSION
-  spec.authors = ["Philippe Creux"]
+  spec.authors = ["Philippe Creux", "Marcus Deans"]
   spec.email = ["pcreux@gmail.com"]
 
-  spec.summary = "CSV Import for humans"
+  spec.summary = "CSV Import for Humans"
   spec.homepage = "https://github.com/rnwbllabs/csv-importer"
   spec.license = "MIT"
 
@@ -36,5 +36,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "standard-sorbet", "~> 0.0.2"
   spec.add_development_dependency "tapioca", "~> 0.11"
 
-  spec.required_ruby_version = ">= 3.0"
+  spec.required_ruby_version = ">= 3.2"
 end

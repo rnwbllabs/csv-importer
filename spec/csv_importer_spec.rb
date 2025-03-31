@@ -144,7 +144,6 @@ describe CSVImporter do
       user.confirmed_at = datastore[:confirmation_map][confirmer] if confirmer
     end
   end
-  # standard:enable Lint/ConstantDefinitionInBlock
 
   before do
     User.reset_store!
@@ -263,12 +262,15 @@ bob@example.com,true,,last,"
       import.valid_header?
       report = import.report
 
-      expect(import.run!).to eq(report)
+      run_result = import.run!
 
-      expect(report).to_not be_success
-      expect(report.status).to eq(:invalid_header)
-      expect(report.missing_columns).to eq(["email"])
-      expect(report.message).to eq("The following columns are required: email")
+      expect(run_result.status).to eq(report.status)
+      expect(run_result.missing_columns).to eq(report.missing_columns)
+
+      expect(run_result).to_not be_success
+      expect(run_result.status).to eq(:invalid_header)
+      expect(run_result.missing_columns).to eq(["email"])
+      expect(run_result.message).to eq("The following columns are required: email")
     end
   end
 
@@ -835,4 +837,180 @@ second@example.com,second,user"
       expect(jane.email).to eq("jane@example.org")
     end
   end
+
+  describe "custom error handling" do
+    class ImportUserWithCustomErrors
+      include CSVImporter
+
+      model User
+
+      column :email, required: true
+      column :first_name, to: :f_name, required: true
+      column :last_name, to: :l_name
+      column :age, virtual: true
+
+      after_build do |user|
+        # Add custom error for a CSV column
+        if csv_attributes["age"] && csv_attributes["age"].to_i < 18
+          add_error("age", "Must be 18 or older")
+        end
+
+        # Add error for a model attribute
+        if user&.email&.end_with?("@gmail.com")
+          add_model_error(:email, "Gmail addresses are not accepted")
+        end
+
+        # Add a general error not tied to any column
+        if user.f_name == "bad" && user.l_name == "person"
+          add_general_error("This person is not allowed")
+        end
+      end
+    end
+
+    it "skips rows with custom errors" do
+      csv_content = "email,first_name,last_name,age
+valid@example.com,john,doe,25
+young@example.com,jane,smith,16
+bad@gmail.com,bob,jones,30
+bad@example.com,bad,person,40"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Check report stats
+      expect(import.report.valid_rows.size).to eq(1)
+      expect(import.report.created_rows.size).to eq(1)
+      expect(import.report.create_skipped_rows.size).to eq(3)
+
+      # Verify only the valid record was created
+      expect(User.find_by(email: "valid@example.com")).to be_present
+      expect(User.find_by(email: "young@example.com")).to be_nil
+      expect(User.find_by(email: "bad@gmail.com")).to be_nil
+      expect(User.find_by(email: "bad@example.com")).to be_nil
+    end
+
+    it "includes custom errors in the error messages" do
+      csv_content = "email,first_name,last_name,age
+young@example.com,jane,smith,16"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Find the skipped row
+      row = import.report.create_skipped_rows.first
+
+      # Check that the error is associated with the correct column
+      expect(row.errors).to include("age")
+      expect(row.errors["age"]).to eq("Must be 18 or older")
+    end
+
+    it "maps model attribute errors to CSV columns" do
+      csv_content = "email,first_name,last_name,age
+bad@gmail.com,bob,jones,30"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Find the skipped row
+      row = import.report.create_skipped_rows.first
+
+      # Check that the error is associated with the email column
+      expect(row.errors).to include("email")
+      expect(row.errors["email"]).to eq("Gmail addresses are not accepted")
+    end
+
+    it "handles general errors not tied to columns" do
+      csv_content = "email,first_name,last_name,age
+bad@example.com,bad,person,40"
+
+      import = ImportUserWithCustomErrors.new(content: csv_content)
+      import.run!
+
+      # Find the skipped row
+      row = import.report.create_skipped_rows.first
+
+      # Check that the general error is included
+      expect(row.errors).to include("_general")
+      expect(row.errors["_general"]).to eq("This person is not allowed")
+    end
+  end
+
+  describe "preview mode" do
+    it "validates data without persisting records" do
+      csv_content = "email,first_name,last_name
+bob@example.com,bob,example
+invalid_email,john,doe
+alice@example.com,alice,example"
+
+      # Set up a single import instance for both preview and actual run
+      import = ImportUserCSV.new(content: csv_content)
+
+      # First, run in preview mode
+      preview_report = import.preview!
+
+      # No records should be created
+      expect(User.store.size).to eq(1)  # Only the initial test user
+
+      # Preview report should show what would happen
+      expect(preview_report.preview?).to eq(true)
+      expect(preview_report.created_rows.size).to eq(2)  # Would create 2 valid users
+      expect(preview_report.failed_to_create_rows.size).to eq(1)  # 1 invalid email
+
+      # Now run the actual import using the same instance
+      actual_report = import.run!
+
+      # Records should now be created
+      expect(User.store.size).to eq(3)  # Initial + 2 new users
+      expect(actual_report.preview?).to eq(false)
+      expect(actual_report.created_rows.size).to eq(2)
+      expect(actual_report.failed_to_create_rows.size).to eq(1)
+    end
+
+    it "can be configured via the config option" do
+      csv_content = "email,first_name,last_name
+bob@example.com,bob,example"
+
+      # Set preview_mode in constructor
+      import = ImportUserCSV.new(content: csv_content, preview_mode: true)
+      import.run!
+
+      # No records should be created
+      expect(User.store.size).to eq(1)  # Only the initial test user
+    end
+
+    it "respects custom validations in after_build hooks" do
+      class ImportUserWithCustomValidations
+        include CSVImporter
+
+        model User
+
+        column :email, required: true
+        column :first_name, to: :f_name
+
+        after_build do |user|
+          if user.f_name == "invalid"
+            add_error("first_name", "First name cannot be 'invalid'")
+          end
+        end
+      end
+
+      csv_content = "email,first_name
+valid@example.com,valid
+invalid@example.com,invalid"
+
+      # Run in preview mode
+      import = ImportUserWithCustomValidations.new(content: csv_content)
+      report = import.preview!
+
+      # Should identify valid and invalid rows
+      expect(report.valid_rows.size).to eq(1)
+      expect(report.valid_rows.first.csv_attributes["first_name"]).to eq("valid")
+      expect(report.create_skipped_rows.size).to eq(1)
+      expect(report.create_skipped_rows.first.csv_attributes["first_name"]).to eq("invalid")
+
+      # No records should be created
+      expect(User.store.size).to eq(1)  # Only the initial test user
+    end
+  end
+  # standard:enable Lint/ConstantDefinitionInBlock
 end
