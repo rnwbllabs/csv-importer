@@ -6,14 +6,8 @@ real data.
 CSVImporter aims to handle validations, column mapping, import
 and reporting.
 
-[![Build
-Status](https://travis-ci.org/pcreux/csv-importer.svg)](https://travis-ci.org/pcreux/csv-importer)
-[![Code
-Climate](https://codeclimate.com/github/pcreux/csv-importer/badges/gpa.svg)](https://codeclimate.com/github/pcreux/csv-importer)
-[![Test
-Coverage](https://codeclimate.com/github/pcreux/csv-importer/badges/coverage.svg)](https://codeclimate.com/github/pcreux/csv-importer/coverage)
-[![Gem
-Version](https://badge.fury.io/rb/csv-importer.svg)](http://badge.fury.io/rb/csv-importer)
+[![CI Status](https://github.com/YOUR_USERNAME/csv-importer/workflows/CI/badge.svg)](https://github.com/rnwbllabs/csv-importer/actions)
+[![Gem Version](https://badge.fury.io/rb/csv-importer.svg)](http://badge.fury.io/rb/csv-importer)
 
 ## Rationale
 
@@ -208,6 +202,32 @@ class DateTransformer
 end
 ```
 
+#### Virtual Columns
+
+You can define virtual columns that don't map directly to model attributes but are still processed during import:
+
+```ruby
+class ImportUserCSV
+  include CSVImporter
+
+  model User
+
+  column :email, required: true
+  column :full_name, virtual: true, to: ->(full_name, user) do
+    first_name, last_name = full_name.split(' ', 2)
+    user.first_name = first_name
+    user.last_name = last_name
+  end
+end
+```
+
+Virtual columns are useful for:
+- Processing combined fields (like full name into first and last name)
+- Handling computed or temporary data that doesn't map directly to your model
+- Validating data without storing it
+
+#### Required Columns
+
 Now, what if the user does not provide the email column? It's not worth
 running the import, we should just reject the CSV file right away.
 That's easy:
@@ -351,6 +371,35 @@ UserImport.new(file: my_file) do
 end
 ```
 
+### `before_import` callback
+
+The `before_import` callback runs once before the import process begins. It's useful for setup tasks, validation, or any processing needed before individual rows are handled.
+
+```ruby
+class ImportUserCSV
+  include CSVImporter
+
+  model User
+
+  column :email
+
+  before_import do
+    # Perform setup operations
+    Rails.logger.info "Starting import with #{rows.count} rows"
+
+    # You can abort the import if needed
+    abort!("Too many rows") if rows.count > 1000
+  end
+end
+```
+
+The callback provides access to all rows before processing and can be used to:
+- Validate the overall dataset
+- Prepare related records or dependencies
+- Log import start information
+- Abort the import based on dataset characteristics
+- Set up shared data in the datastore for use in row processing
+
 ### Skip import
 
 You can skip the import of a model by calling `skip!` in an
@@ -377,6 +426,67 @@ import = ImportUserCSV.new(file: params[:csv_file])
 import.valid_header? # => false
 import.report.message # => "The following columns are required: "email""
 ```
+
+### Preview Mode
+
+You can run the import in preview mode to validate data and show potential results without actually saving records:
+
+```ruby
+# Option 1: Using the preview! method
+import = ImportUserCSV.new(file: params[:csv_file])
+report = import.preview!
+
+# Option 2: Setting preview_mode in the constructor
+import = ImportUserCSV.new(file: params[:csv_file], preview_mode: true)
+report = import.run!
+
+# Check validation results without actual database changes
+report.preview? # => true
+report.valid_rows.map { |row| [row.model.email, row.model.valid?] }
+```
+
+Preview mode is useful for:
+- Showing users validation results before committing to an import
+- Testing column mappings and transformations
+- Detecting potential errors early
+- Providing row counts and statistics before actual import
+
+### Custom Error Handling
+
+You can add custom validation errors during the import process to provide more context or implement business logic:
+
+```ruby
+class ImportUserCSV
+  include CSVImporter
+
+  model User
+
+  column :email, required: true
+  column :age, virtual: true
+
+  after_build do |user|
+    # Add error for a specific CSV column
+    if csv_attributes["age"] && csv_attributes["age"].to_i < 18
+      add_error("age", "Must be 18 or older")
+    end
+
+    # Add error for a model attribute
+    if user.email && user.email.end_with?("@example.com")
+      add_model_error(:email, "Example.com addresses not accepted")
+    end
+
+    # Add a general error not tied to any specific column
+    if user.first_name == "Admin" && user.last_name == "User"
+      add_general_error("Admin users cannot be imported")
+    end
+  end
+end
+```
+
+Custom error handling provides:
+- Better context about validation failures
+- Business logic validation beyond model validations
+- User-friendly messages specific to the import process
 
 ### Run the import and provide feedback to the user
 
@@ -443,6 +553,34 @@ You can handle exotic encodings with the `encoding` option.
 ```ruby
 ImportUserCSV.new(content: "メール,氏名".encode('SJIS'), encoding: 'SJIS:UTF-8')
 ```
+
+## Sorbet Integration
+
+CSVImporter works with Sorbet for type checking. To use it in a Sorbet project, ensure your importer classes are properly typed:
+
+```ruby
+# typed: strict
+class ImportUserCSV
+  extend T::Sig
+  include CSVImporter
+
+  model User
+
+  column :email, required: true
+  column :first_name
+  column :last_name
+
+  sig { params(user: User).void }
+  after_build do |user|
+    user.username = user.email.split('@').first if user.email.present?
+  end
+end
+```
+
+Key benefits of using Sorbet with CSVImporter:
+- Type safety for column transformers and callbacks
+- Better IDE support and documentation
+- Catch errors at development time rather than runtime
 
 ## Development
 
