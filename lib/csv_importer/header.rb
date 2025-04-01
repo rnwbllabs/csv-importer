@@ -57,7 +57,12 @@ module CSVImporter
       end
 
       if definition
-        column_names.find { |name| definition.match?(name) }
+        # Find the column name and convert it to a string before and after
+        found_name = column_names.find do |name|
+          # Convert to string for matching
+          definition.match?(name.to_s)
+        end
+        found_name ? found_name.to_s : nil
       else
         nil
       end

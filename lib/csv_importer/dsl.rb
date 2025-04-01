@@ -10,76 +10,103 @@ module CSVImporter
 
     requires_ancestor { ConfigInterface }
 
-    # Set the model to which imported data will be mapped
-    # @param model_klass [Class] the model to which imported data will be mapped
+    # Definition of the model class to use for this import
+    # @note For multi-model imports, use the `models` method instead
+    # @param model_klass [Class] The model class to use
+    # @return [Class] The model class
+    sig { params(model_klass: T.untyped).returns(T.untyped) }
     def model(model_klass)
       config.model = model_klass
       # For backward compatibility, also populate the models hash
       config.models[:_default] = model_klass
     end
 
-    # Set multiple models for mapping CSV columns to different model types
-    # @param models [Hash<Symbol, Class>] a hash mapping model keys to model classes
-    # @example
+    # Definition of multiple model classes to use for this import
+    # @example Define multiple models for a time card import
     #   models user: User, time_card: TimeCard
+    # @param models [Hash<Symbol, Class>] A hash mapping model keys to model classes
+    # @return [Hash<Symbol, Class>] The models hash
+    sig { params(models: T::Hash[Symbol, T.untyped]).returns(T::Hash[Symbol, T.untyped]) }
     def models(models)
       config.models = models
     end
 
-    # Set the order in which models should be persisted
-    # @param order [Array<Symbol>] the order in which models should be persisted
-    # @example
+    # Define the order in which models should be persisted
+    # This is crucial for maintaining proper foreign key relationships
+    # @example Set persistence order for time cards requiring users to exist first
     #   persist_order [:user, :time_card]
+    # @param order [Array<Symbol>] The order of model keys for persistence
+    # @return [Array<Symbol>] The persistence order
+    sig { params(order: T::Array[Symbol]).returns(T::Array[Symbol]) }
     def persist_order(order)
       config.persist_order = order
     end
 
-    # Define a column for the model
-    # @param name [Symbol] the name of the column
-    # @param to [Symbol, Proc, nil] the attribute on the model that will be set with the value of the column. If nil,
-    #   the name of the column in the CSV file will be used.
-    # @param as [Symbol, String, Regexp, Array, nil] more complex matching logic for the name of the column in the CSV file.
-    #   If nil, the name of the column in the CSV file will be used.
-    # @param required [Boolean] [Optional] whether the column is required, i.e., the importer will raise an error if
-    #   the column is not present in the CSV file. Defaults to false.
-    # @param virtual [Boolean] [Optional] whether the column is virtual, i.e., not present on the associated model and
-    #   won't be set on the model at all. Defaults to false.
-    # @param model [Symbol] [Optional] the key of the model this column belongs to. If not specified, the column
-    #   will be mapped to the default model.
-    # @param options [Hash] the options for the column
+    # Define a column mapping for the import
+    # @param name [Symbol] the name of the attribute into which the CSV column value will be stored
+    # @param to [Symbol, Proc, Class] (optional) the name of the model attribute to set or a transformer
+    # @param as [Symbol, String, Regexp, Array] (optional) a matcher for the column header
+    # @param required [Boolean] (optional) whether the column is required (default: false)
+    # @param virtual [Boolean] (optional) whether the column should be ignored (default: false)
+    # @param model [Symbol] (optional) the model key this column belongs to (for multi-model imports)
+    # @return [ColumnDefinition] the column definition
+    # @example Map a CSV column to a model attribute
+    #   column :email
+    # @example Map a CSV column to a different model attribute
+    #   column :email, to: :login
+    # @example Transform the value before setting it
+    #   column :email, to: ->(value) { value.downcase }
+    # @example Map a CSV column to a specific model in multi-model import
+    #   column :email, model: :user
+    #   column :hours_worked, model: :time_card
     sig do
       params(
         name: Symbol,
-        to: CSVImporter::ColumnDefinition::ToType,
-        as: CSVImporter::ColumnDefinition::AsType,
-        required: T.nilable(T::Boolean),
-        virtual: T.nilable(T::Boolean),
+        to: T.nilable(T.any(Symbol, T.untyped)),
+        as: T.nilable(T.any(Regexp, String, Symbol, T::Array[T.nilable(T.any(String, Symbol))])),
+        required: T::Boolean,
+        virtual: T::Boolean,
         model: T.nilable(Symbol)
-      ).void
+      ).returns(ColumnDefinition)
     end
     def column(name, to: nil, as: nil, required: false, virtual: false, model: nil)
       column_definition = ColumnDefinition.new(
-        name:, to:, as:, required: required || false, virtual: virtual || false, model: model
+        name: name,
+        to: to || name,
+        as: as,
+        required: required,
+        virtual: virtual,
+        model: model
       )
       config.column_definitions << column_definition
+      column_definition
     end
 
-    # Define the identifiers for the model, used to uniquely identify a record for finding or creating it
-    # @param params [Symbol, Array, Proc] the identifiers for the model
+    # Define identifiers for the model for find_or_create behavior
+    # @note For multi-model imports, use `model_identifier` method instead
+    # @param params [Array<Symbol>, Proc] Either array of attributes or proc returning identifier(s)
+    # @return [T.any(Array<Symbol>, Proc)] The identifiers
+    sig { params(params: T.untyped).returns(T.untyped) }
     def identifier(*params)
       config.identifiers = params.first.is_a?(Proc) ? params.first : params
     end
 
     alias_method :identifiers, :identifier
 
-    # Define the identifiers for a specific model, used to uniquely identify a record for finding or creating it
-    # @param model_key [Symbol] the key of the model these identifiers are for
-    # @param params [Symbol, Array, Proc] the identifiers for the model
+    # Define identifiers for a specific model in multi-model imports
+    # @example Define email as identifier for users
+    #   model_identifier :user, :email
+    # @example Define compound identifiers for time cards
+    #   model_identifier :time_card, :user_id, :date
+    # @example Define dynamic identifiers with a proc
+    #   model_identifier :user, ->(user) { user.email.present? ? :email : [:first_name, :last_name] }
+    # @param model_key [Symbol] The key of the model to set identifiers for
+    # @param params [Array<Symbol>, Proc] Either array of attributes or proc returning identifier(s)
+    # @return [T.any(Array<Symbol>, Proc)] The identifiers for the specified model
+    sig { params(model_key: Symbol, params: T.untyped).returns(T.untyped) }
     def model_identifier(model_key, *params)
       config.model_identifiers[model_key] = params.first.is_a?(Proc) ? params.first : params
     end
-
-    alias_method :model_identifiers, :model_identifier
 
     # Action to take when a record is invalid
     # @param action [Symbol] the action to take when a record is invalid

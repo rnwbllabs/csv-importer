@@ -70,7 +70,18 @@ module CSVImporter
     end
 
     # Custom error class raised when the import is aborted
-    ImportAborted = Class.new(StandardError)
+    ImportAborted = Class.new(StandardError) do
+      extend T::Sig
+
+      sig { returns(T.nilable(Row)) }
+      attr_reader :row
+
+      sig { params(message: String, row: T.nilable(Row)).void }
+      def initialize(message, row = nil)
+        @row = T.let(row, T.nilable(Row))
+        super(message)
+      end
+    end
 
     # Persist the rows' model and return a `Report`
     # @return [Report] the report summarizing the import results
@@ -85,12 +96,22 @@ module CSVImporter
 
       report.in_progress!
 
-      persist_rows!
+      puts "DEBUG: Runner#call - Initial report.invalid_rows.size: #{report.invalid_rows.size}"
 
-      report.done!
-      report
-    rescue ImportAborted
-      report.aborted!
+      begin
+        persist_rows!
+        puts "DEBUG: Runner#call - After persist_rows! report.invalid_rows.size: #{report.invalid_rows.size}"
+        report.done!
+      rescue ImportAborted => e
+        puts "DEBUG: ImportAborted exception caught in call method"
+        puts "DEBUG: Before aborted! report.invalid_rows.size: #{report.invalid_rows.size}"
+
+        # The invalid row should already be added by process_row before the exception was raised
+        report.aborted!
+        puts "DEBUG: After aborted! report.invalid_rows.size: #{report.invalid_rows.size}"
+      end
+
+      puts "DEBUG: Returning report with status=#{report.status}, invalid_rows=#{report.invalid_rows.size}"
       report
     end
 
@@ -114,166 +135,245 @@ module CSVImporter
       end
     end
 
-    # Process a single row
-    # @param row [Row] the row to process
+    # Process a row and add it to the report
+    # @param row [Row] The row to process
     # @return [void]
     sig { params(row: Row).void }
     def process_row(row)
-      # Skip processing if row is marked to skip
-      return if row.skip?
-
-      # Check if the row is valid before attempting to save
-      unless row.valid?
-        add_row_to_report(row, :failure)
-        raise ImportAborted if abort_when_invalid?
+      # Skip if the row is not valid (no model class or models)
+      if (!row.legacy_mode? && row.built_models.empty?) || (row.legacy_mode? && row.model.nil?)
+        report.add_invalid_row(row)
         return
       end
 
-      if preview_mode
-        # In preview mode, just mark as success for valid models
-        add_row_to_report(row, :success)
-      else
-        # In normal mode, persist the models in the specified order
-        save_models_for_row(row)
+      # If the model has validation errors, add to invalid_rows
+      if !row.valid?
+        # Add to the invalid_rows collection
+        report.add_invalid_row(row)
+        puts "DEBUG: Added row #{row.line_number} to invalid_rows collection"
+
+        # Determine if model was persisted before validation
+        was_persisted = false
+        if row.legacy_mode?
+          model = row.model
+          was_persisted = model.respond_to?(:persisted?) && model.persisted? if model
+        else
+          order = row.models_in_order
+          if !order.empty? && row.built_models.key?(order.first)
+            primary_model = row.built_models[order.first]
+            was_persisted = primary_model.respond_to?(:persisted?) && primary_model.persisted?
+          end
+        end
+
+        # Store this for proper reporting
+        row.instance_variable_set(:@_was_persisted, was_persisted)
+
+        # Add invalid row to the appropriate failed collection
+        if was_persisted
+          report.failed_to_update_rows << row
+        else
+          report.failed_to_create_rows << row
+        end
+
+        # For abort mode, raise ImportAborted exception after finding the first invalid row
+        if abort_when_invalid?
+          # Debug validation and abort condition
+          puts "DEBUG: Row validation failed, row_number=#{row.line_number}"
+          puts "DEBUG: when_invalid=#{when_invalid}, abort_condition=#{abort_when_invalid?}"
+          puts "DEBUG: Raising ImportAborted exception"
+
+          # This will abort the transaction and trigger the rescue handler
+          raise ImportAborted.new("Import aborted due to invalid row", row)
+        end
+
+        # Skip invalid rows based on when_invalid setting, but only if
+        # we aren't already adding it to failed_to_create/update
+        if when_invalid == :skip && !row.skip?
+          row.skip!
+        end
+
+        # Return early since we've handled this invalid row
+        return
       end
 
-      # Only run after_save hooks if not in preview mode
-      return if preview_mode
+      # Skip already invalid or marked-to-skip rows
+      if row.skip?
+        # Store whether the model was persisted for proper skip reporting
+        primary_model_was_persisted = false
 
-      run_after_save_hooks(row)
-    end
+        if row.legacy_mode?
+          model = row.model
+          primary_model_was_persisted = model.respond_to?(:persisted?) && model.persisted? if model
+        else
+          order = row.models_in_order
+          if !order.empty? && row.built_models.key?(order.first)
+            primary_model = row.built_models[order.first]
+            primary_model_was_persisted = primary_model.respond_to?(:persisted?) && primary_model.persisted?
+          end
+        end
 
-    # Save all models for a row in the specified order
-    # @param row [Row] the row containing models to save
-    # @return [void]
-    sig { params(row: Row).void }
-    def save_models_for_row(row)
-      # Get the models to persist in the correct order
-      models_list = get_models_to_persist(row)
-      success = persist_models_in_order(row, models_list)
+        # Store this for the report
+        row.instance_variable_set(:@_was_persisted, primary_model_was_persisted)
 
-      # Report final status
-      add_row_to_report(row, success ? :success : :failure)
-    end
-
-    # Get the list of models to persist in the correct order
-    # @param row [Row] the row containing models
-    # @return [Array<Array>] list of [model_key, model] pairs
-    sig { params(row: Row).returns(T::Array[T::Array[T.untyped]]) }
-    def get_models_to_persist(row)
-      # Get the persist order, or use all model keys if empty
-      persist_order = row.persist_order.dup
-      if persist_order.empty?
-        persist_order = row.models.keys.to_a
+        add_row_to_report(row, :skip)
+        return
       end
 
-      # Build list of models to persist
-      models_list = []
-      persist_order.each do |model_key|
-        next unless row.built_models.key?(model_key)
-        models_list << [model_key, row.built_models[model_key]]
-      end
+      # Update or create model(s)
+      save_models_for_row(row)
 
-      models_list
-    end
-
-    # Persist models in the given order
-    # @param row [Row] the row containing models
-    # @param models_list [Array<Array>] list of [model_key, model] pairs
-    # @return [Boolean] whether all models were saved successfully
-    sig { params(row: Row, models_list: T::Array[T::Array[T.untyped]]).returns(T::Boolean) }
-    def persist_models_in_order(row, models_list)
-      # Use a method to process each model and return a boolean status
-      process_all_models(row, models_list)
-    end
-
-    # Process all models and return success status
-    # @param row [Row] the row containing models
-    # @param models_list [Array<Array>] list of [model_key, model] pairs
-    # @return [Boolean] whether all models were saved successfully
-    sig { params(row: Row, models_list: T::Array[T::Array[T.untyped]]).returns(T::Boolean) }
-    def process_all_models(row, models_list)
-      # Process models in a separate method that returns true if all saved
-      all_models_saved?(row, models_list)
-    end
-
-    # Check if all models saved successfully
-    # @param row [Row] the row containing models
-    # @param models_list [Array<Array>] list of [model_key, model] pairs
-    # @return [Boolean] true if all models saved successfully
-    sig { params(row: Row, models_list: T::Array[T::Array[T.untyped]]).returns(T::Boolean) }
-    def all_models_saved?(row, models_list)
-      # Check each model and return false at first failure
-      models_list.each do |model_info|
-        model_key, model = model_info
-
-        # Skip if either key or model is nil
-        next unless model_key && model
-
-        # Skip if model doesn't respond to save
-        next unless model.respond_to?(:save)
-
-        # If any model fails to save, return false immediately
-        unless process_single_model(row, model)
-          return false
+      # Only run after_save hooks if not in preview mode and row was saved successfully
+      unless preview_mode
+        status = row.instance_variable_defined?(:@status) ? row.instance_variable_get(:@status) : nil
+        if [:created, :updated].include?(status)
+          run_after_save_hooks(row)
         end
       end
 
-      # If we get here, all models saved successfully
-      true
+      # Add row to the report if not already added during save
+      if preview_mode
+        # In preview mode, just mark as success for valid models
+        add_row_to_report(row, :success)
+      end
     end
 
-    # Process a single model and handle any failures
-    # @param row [Row] the row containing the model
-    # @param model [Object] the model to save
-    # @return [Boolean] whether the model was saved successfully
-    sig { params(row: Row, model: T.untyped).returns(T::Boolean) }
-    def process_single_model(row, model)
-      # Try to save the model
-      saved = model.save
+    # Save models for a row
+    # @param row [Row] The row to save
+    # @return [void]
+    sig { params(row: Row).void }
+    def save_models_for_row(row)
+      return if row.skip?
 
-      # If save failed, handle according to configuration
-      if !saved && abort_when_invalid?
-        add_row_to_report(row, :failure)
-        raise ImportAborted
+      # Track primary model's persistence state before saving
+      primary_model_was_persisted = false
+
+      # Handle legacy mode (single model) and multi-model differently
+      if row.legacy_mode?
+        # Legacy mode - single model
+        model = row.model
+        if model.nil?
+          add_row_to_report(row, :failure)
+          return
+        end
+
+        # Store persistence state before saving
+        primary_model_was_persisted = model.respond_to?(:persisted?) && model.persisted?
+        # Store this for the report
+        row.instance_variable_set(:@_was_persisted, primary_model_was_persisted)
+
+        # Save and update status
+        if !preview_mode && model.save
+          add_row_to_report(row, :success)
+          # Record status for after_save hooks
+          row.instance_variable_set(:@status, primary_model_was_persisted ? :updated : :created)
+        else
+          # Check errors again after save failure
+          row.check_errors(when_invalid == :skip)
+          add_row_to_report(row, :failure)
+          # Record status for after_save hooks
+          row.instance_variable_set(:@status, :failed)
+        end
+      else
+        # Multi-model mode - handle models in order
+        order = row.persist_order.empty? ? row.models.keys.to_a : row.persist_order.dup
+
+        if !row.built_models.key?(order.first)
+          add_row_to_report(row, :failure)
+          row.instance_variable_set(:@status, :failed)
+          return
+        end
+
+        primary_model = row.built_models[order.first]
+
+        # Store persistence state of primary model before saving
+        primary_model_was_persisted = primary_model.respond_to?(:persisted?) && primary_model.persisted?
+        # Store this for the report
+        row.instance_variable_set(:@_was_persisted, primary_model_was_persisted)
+
+        # Try to save all models in order (if not in preview mode)
+        if !preview_mode
+          success = order.all? do |key|
+            next true unless row.built_models.key?(key)
+            model = row.built_models[key]
+            next true if model.nil?
+
+            model.save
+          end
+
+          # Update row status based on save result
+          if success
+            add_row_to_report(row, :success)
+            # Record status for after_save hooks
+            row.instance_variable_set(:@status, primary_model_was_persisted ? :updated : :created)
+          else
+            # Check errors again after save failure
+            row.check_errors(when_invalid == :skip)
+            add_row_to_report(row, :failure)
+            # Record status for after_save hooks
+            row.instance_variable_set(:@status, :failed)
+          end
+        end
       end
-
-      saved
     end
 
     # Add a row to the report based on its status
     # @param row [Row] the row to add to the report
-    # @param status [Symbol] the status of the row (:success or :failure)
+    # @param status [Symbol] the status of the row (:success, :failure, or :skip)
     # @return [void]
     sig { params(row: Row, status: Symbol).void }
     def add_row_to_report(row, status)
-      # Get the model for the report (for backward compatibility use :_default or first model)
-      first_model = row.built_models[:_default] || row.built_models.values.first
+      # Special case for skips - we may need to check already stored persistence state
+      if status == :skip
+        # Check if the row has persistence information stored
+        was_persisted = false
+        if row.instance_variable_defined?(:@_was_persisted)
+          was_persisted = row.instance_variable_get(:@_was_persisted)
+        else
+          # Try to determine from the current state of the model
+          if row.legacy_mode?
+            model = row.model
+            was_persisted = model.respond_to?(:persisted?) && model.persisted? if model
+          else
+            # For multi-model case, check the primary model
+            order = row.models_in_order
+            if !order.empty? && row.built_models.key?(order.first)
+              primary_model = row.built_models[order.first]
+              was_persisted = primary_model.respond_to?(:persisted?) && primary_model.persisted?
+            end
+          end
+        end
 
-      # Determine if this is a create or update operation
-      persisted = false
-      if first_model
-        persisted = first_model.persisted?
+        if was_persisted
+          report.update_skipped_rows << row
+        else
+          report.create_skipped_rows << row
+        end
+        return
+      end
+
+      # Determine if model was persisted before save attempt
+      # Check if we stored this information during save
+      was_persisted = false
+      if row.instance_variable_defined?(:@_was_persisted)
+        was_persisted = row.instance_variable_get(:@_was_persisted)
+      else
+        # Fall back to current persisted state if we don't have historical information
+        model = row.legacy_mode? ? row.model : (row.built_models[:_default] || (row.built_models.values.first if row.built_models.any?))
+        was_persisted = model.respond_to?(:persisted?) && model.persisted? if model
       end
 
       # Add the row to the appropriate bucket based on status and persistence
       if status == :success
-        if persisted
+        if was_persisted
           report.updated_rows << row
         else
           report.created_rows << row
         end
       elsif status == :failure
-        if persisted
+        if was_persisted
           report.failed_to_update_rows << row
         else
           report.failed_to_create_rows << row
-        end
-      else # skip
-        if persisted
-          report.update_skipped_rows << row
-        else
-          report.create_skipped_rows << row
         end
       end
     end
@@ -289,14 +389,25 @@ module CSVImporter
         arity = block.arity
 
         if arity == 1
-          # For backwards compatibility with single model
-          block.call(row.model)
+          # For legacy single model or provide the row
+          if row.legacy_mode?
+            block.call(row.model)
+          else
+            # For new style with row
+            block.call(row)
+          end
         elsif arity == 0
-          # For new style with row
+          # Zero args, just call the block
           block.call
         elsif arity == 2
-          # Support legacy three-argument style (model, csv_attributes)
-          block.call(row.model, row.csv_attributes)
+          # Support legacy two-argument style (model, csv_attributes)
+          if row.legacy_mode?
+            block.call(row.model, row.csv_attributes)
+          else
+            # Best attempt for multi-model case
+            primary_model = row.built_models.values.first
+            block.call(primary_model, row.csv_attributes)
+          end
         else
           # Just call with row if we can't determine the proper arity
           block.call(row)
