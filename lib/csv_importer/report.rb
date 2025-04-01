@@ -73,6 +73,11 @@ module CSVImporter
     sig { returns(T::Array[Row]) }
     attr_accessor :update_skipped_rows
 
+    # @!attribute [r] invalid_rows
+    # @return [Array<Row>] Rows that were invalid (failed validation)
+    sig { returns(T::Array[Row]) }
+    attr_reader :invalid_rows
+
     # @!attribute [r] message_generator
     # @return [Class] The class responsible for generating human-readable messages
     sig { returns(T.class_of(ReportMessage)) }
@@ -90,6 +95,7 @@ module CSVImporter
     # @param failed_to_update_rows [Array<Row>] Rows that failed to update
     # @param create_skipped_rows [Array<Row>] Rows skipped during creation
     # @param update_skipped_rows [Array<Row>] Rows skipped during update
+    # @param invalid_rows [Array<Row>] Rows that were invalid (failed validation)
     # @param message_generator [Class] Class to generate user-friendly messages
     sig do
       params(
@@ -104,12 +110,13 @@ module CSVImporter
         failed_to_update_rows: T::Array[Row],
         create_skipped_rows: T::Array[Row],
         update_skipped_rows: T::Array[Row],
+        invalid_rows: T::Array[Row],
         message_generator: T.class_of(ReportMessage)
       ).void
     end
     def initialize(status: :pending, missing_columns: [], extra_columns: [], parser_error: nil, preview_mode: false, created_rows: [],
       updated_rows: [], failed_to_create_rows: [], failed_to_update_rows: [], create_skipped_rows: [],
-      update_skipped_rows: [], message_generator: ReportMessage)
+      update_skipped_rows: [], invalid_rows: [], message_generator: ReportMessage)
       @status = T.let(status, Symbol)
       @missing_columns = T.let(missing_columns, T::Array[String])
       @extra_columns = T.let(extra_columns, T::Array[String])
@@ -121,12 +128,13 @@ module CSVImporter
       @failed_to_update_rows = T.let(failed_to_update_rows, T::Array[Row])
       @create_skipped_rows = T.let(create_skipped_rows, T::Array[Row])
       @update_skipped_rows = T.let(update_skipped_rows, T::Array[Row])
+      @invalid_rows = T.let(invalid_rows, T::Array[Row])
       @message_generator = T.let(message_generator, T.class_of(ReportMessage))
     end
 
-    # Returns a hash of all report attributes
-    # @return [Hash] All report attributes
-    sig { returns(T::Hash[Symbol, T.untyped]) }
+    # Returns a hash of all attributes of the report
+    # @return [Hash] All the attributes of the report
+    sig { returns(T::Hash[Symbol, T.anything]) }
     def attributes
       {
         status: status,
@@ -140,6 +148,7 @@ module CSVImporter
         failed_to_update_rows: failed_to_update_rows,
         create_skipped_rows: create_skipped_rows,
         update_skipped_rows: update_skipped_rows,
+        invalid_rows: invalid_rows,
         message_generator: message_generator
       }
     end
@@ -151,25 +160,45 @@ module CSVImporter
       created_rows + updated_rows
     end
 
-    # Returns all rows that failed during import
-    # @return [Array<Row>] Array of invalid rows (failed to create or update)
+    # Returns rows that specifically failed validation (not those that failed to save)
+    # @return [Array<Row>] Array of rows that failed validation
     sig { returns(T::Array[Row]) }
-    def invalid_rows
-      failed_to_create_rows + failed_to_update_rows
+    def validation_failed_rows
+      @invalid_rows
+    end
+
+    # Returns all rows that failed during import
+    # @return [Array<Row>] Array of invalid rows (failed to create or update + rows that failed validation)
+    sig { returns(T::Array[Row]) }
+    def all_invalid_rows
+      # Include rows that failed to save and any rows in the validation-specific invalid_rows collection
+      # that aren't already in failed_to_create_rows or failed_to_update_rows
+
+      # Get line numbers from failed rows to avoid double-counting
+      failed_line_numbers = (failed_to_create_rows + failed_to_update_rows).map(&:line_number)
+
+      # Only include rows from @invalid_rows that aren't already in failed rows
+      unique_invalid_rows = @invalid_rows.reject { |row| failed_line_numbers.include?(row.line_number) }
+
+      failed_to_create_rows + failed_to_update_rows + unique_invalid_rows
     end
 
     # Returns all rows that were processed (valid and invalid)
     # @return [Array<Row>] Array of all processed rows
     sig { returns(T::Array[Row]) }
     def all_rows
-      valid_rows + invalid_rows
+      [
+        all_invalid_rows, skipped_rows, created_rows, updated_rows,
+        failed_to_create_rows, failed_to_update_rows,
+        create_skipped_rows, update_skipped_rows
+      ].flatten
     end
 
     # Indicates if the import was completely successful
     # @return [Boolean] true if status is :done and no rows failed
     sig { returns(T::Boolean) }
     def success?
-      done? && invalid_rows.empty?
+      done? && all_invalid_rows.empty?
     end
 
     # Indicates if the import is in the pending state
@@ -274,6 +303,36 @@ module CSVImporter
     sig { returns(T::Boolean) }
     def preview?
       preview_mode
+    end
+
+    # All skipped rows (create and update)
+    # @return [Array<Row>] all rows that were skipped
+    sig { returns(T::Array[Row]) }
+    def skipped_rows
+      create_skipped_rows + update_skipped_rows
+    end
+
+    # Find a row by its line number
+    # @param line_number [Integer] The line number of the row to find
+    # @return [Row, nil] The row with the given line number, or nil if not found
+    sig { params(line_number: Integer).returns(T.nilable(Row)) }
+    def row_by_line_number(line_number)
+      all_rows.find { |row| row.line_number == line_number }
+    end
+
+    # Get all rows that failed to be imported
+    # @return [Array<Row>] All rows that failed to import
+    sig { returns(T::Array[Row]) }
+    def failed_rows
+      failed_to_create_rows + failed_to_update_rows
+    end
+
+    # Add a row to the dedicated invalid_rows collection
+    # @param row [Row] The row to add
+    # @return [void]
+    sig { params(row: Row).void }
+    def add_invalid_row(row)
+      @invalid_rows << row
     end
   end
 end

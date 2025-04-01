@@ -47,17 +47,23 @@ module CSVImporter
       end
     end
 
-    # Column name for a model attribute
-    # @param attribute [Symbol, String] the attribute to find the column name for
-    # @return [String, Symbol, nil] the column name for the attribute, or nil if the attribute is not found
-    sig { params(attribute: T.any(Symbol, String)).returns(T.nilable(T.any(String, Symbol))) }
+    # Get the CSV column name for a model attribute
+    # @param attribute [Symbol] The model attribute
+    # @return [String, nil] The CSV column name or nil if not found
+    sig { params(attribute: Symbol).returns(T.nilable(String)) }
     def column_name_for_model_attribute(attribute)
-      column = columns.find do |column|
-        T.must(column.definition).attribute == attribute if column.definition
+      definition = column_definitions.find do |d|
+        d.to == attribute || d.name == attribute
       end
-      return unless column
 
-      column.name
+      definition&.then do
+        # Find the column name and convert it to a string before and after
+        found_name = column_names.find do |name|
+          # Convert to string for matching
+          definition.match?(name.to_s)
+        end
+        found_name&.to_s
+      end
     end
 
     # Whether the header is valid, i.e., all required columns are present

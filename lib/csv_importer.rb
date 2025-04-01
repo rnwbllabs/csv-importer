@@ -30,6 +30,25 @@ require "csv_importer/dsl"
 #
 #   report = ImportUserCSV.new(file: my_csv).run!
 #   puts report.message
+#
+# @example with multiple models:
+#   class ImportTimeCardCSV
+#     include CSVImporter
+#
+#     models user: User, time_card: TimeCard
+#     persist_order [:user, :time_card]
+#
+#     model_identifier :user, :email
+#     model_identifier :time_card, :user_id, :date
+#
+#     column :email, model: :user
+#     column :first_name, model: :user
+#     column :hours_worked, model: :time_card
+#     column :date, model: :time_card
+#   end
+#
+#   report = ImportTimeCardCSV.new(file: my_csv).run!
+#   puts report.message
 module CSVImporter
   extend T::Sig
   extend T::Helpers
@@ -149,14 +168,38 @@ module CSVImporter
     @header ||= Header.new(column_definitions: config.column_definitions, column_names: csv.header)
   end
 
+  # Create a row for each line in the CSV content
+  # @param header [Header] The CSV header
+  # @param csv_rows [Array<Array<String>>] The CSV rows
+  # @return [Array<Row>] The rows with models
+  sig { params(header: Header, csv_rows: T::Array[T::Array[String]]).returns(T::Array[Row]) }
+  def rows_with_models(header, csv_rows)
+    csv_rows.map.with_index(2) do |row_array, line_number|
+      # For backward compatibility, pass both the legacy model_klass and the new models hash
+      # This ensures the Row can work with either implementation
+      # If we're using the new multi-model approach, the Row class will use the models hash
+      # Otherwise, it will fall back to the legacy model_klass
+      Row.new(
+        line_number: line_number,
+        header: header,
+        row_array: row_array,
+        model_klass: config.model,                # Legacy model class
+        identifiers: config.identifiers,          # Legacy identifiers
+        models: config.models,                    # New multi-model hash
+        persist_order: config.persist_order,      # New model persistence order
+        model_identifiers: config.model_identifiers, # New model identifiers
+        after_build_blocks: config.after_build_blocks,
+        datastore: datastore
+      )
+    end
+  end
+
   # Initialize and return the `Row`s for the current CSV file
   # @return [T::Array[Row]] - The rows for the import
   sig { returns(T::Array[Row]) }
   def rows
-    csv.rows.map.with_index(2) do |row_array, line_number|
-      Row.new(header: header, line_number: line_number, row_array: row_array, model_klass: config.model,
-        identifiers: config.identifiers, after_build_blocks: config.after_build_blocks, datastore: datastore)
-    end
+    # Use rows_with_models to create the rows
+    rows_with_models(header, csv.rows)
   end
 
   # Check if the header is valid
@@ -192,7 +235,7 @@ module CSVImporter
         end
       end
 
-      @report = Runner.call(rows: rows, when_invalid: config.when_invalid,
+      @report = Runner.call(rows: rows_with_models(header, csv.rows), when_invalid: config.when_invalid,
         after_save_blocks: config.after_save_blocks, preview_mode: config.preview_mode, report: @report)
     else
       @report

@@ -84,11 +84,16 @@ module CSVImporter
     # @example "3 created. 4 updated. 1 failed to create. 2 failed to update."
     sig { returns(String) }
     def import_details
-      report.attributes
+      # Create a consistent message format based on what's actually in the report
+      # Get all buckets that contain rows
+      buckets = report.attributes
         .select { |name, _| name.to_s.include?("_rows") }
-        .select { |_, instances| instances.size > 0 }
+        .select { |_, instances| !instances.empty? }
         .map { |bucket, instances| "#{instances.size} #{bucket.to_s.gsub("_rows", "").tr("_", " ")}" }
         .join(", ")
+
+      # Return blank string if no buckets have rows
+      buckets.empty? ? "" : buckets
     end
   end
 end
