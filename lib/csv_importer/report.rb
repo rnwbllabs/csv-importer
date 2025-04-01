@@ -76,7 +76,7 @@ module CSVImporter
     # @!attribute [r] invalid_rows
     # @return [Array<Row>] Rows that were invalid (failed validation)
     sig { returns(T::Array[Row]) }
-    attr_accessor :invalid_rows
+    attr_reader :invalid_rows
 
     # @!attribute [r] message_generator
     # @return [Class] The class responsible for generating human-readable messages
@@ -170,7 +170,7 @@ module CSVImporter
     # Returns all rows that failed during import
     # @return [Array<Row>] Array of invalid rows (failed to create or update + rows that failed validation)
     sig { returns(T::Array[Row]) }
-    def invalid_rows
+    def all_invalid_rows
       # Include rows that failed to save and any rows in the validation-specific invalid_rows collection
       # that aren't already in failed_to_create_rows or failed_to_update_rows
 
@@ -187,14 +187,18 @@ module CSVImporter
     # @return [Array<Row>] Array of all processed rows
     sig { returns(T::Array[Row]) }
     def all_rows
-      valid_rows + invalid_rows
+      [
+        all_invalid_rows, skipped_rows, created_rows, updated_rows,
+        failed_to_create_rows, failed_to_update_rows,
+        create_skipped_rows, update_skipped_rows
+      ].flatten
     end
 
     # Indicates if the import was completely successful
     # @return [Boolean] true if status is :done and no rows failed
     sig { returns(T::Boolean) }
     def success?
-      done? && invalid_rows.empty?
+      done? && all_invalid_rows.empty?
     end
 
     # Indicates if the import is in the pending state
@@ -308,31 +312,12 @@ module CSVImporter
       create_skipped_rows + update_skipped_rows
     end
 
-    # Find a row by line number in any of the report's row collections
+    # Find a row by its line number
     # @param line_number [Integer] The line number of the row to find
     # @return [Row, nil] The row with the given line number, or nil if not found
     sig { params(line_number: Integer).returns(T.nilable(Row)) }
     def row_by_line_number(line_number)
       all_rows.find { |row| row.line_number == line_number }
-    end
-
-    # Get all rows in the report
-    # @return [Array<Row>] All rows in the report
-    sig { returns(T::Array[Row]) }
-    def all_rows
-      [
-        invalid_rows, skipped_rows, created_rows, updated_rows,
-        failed_to_create_rows, failed_to_update_rows,
-        create_skipped_rows, update_skipped_rows
-      ].flatten
-    end
-
-    # Get all rows that would be valid rows during import
-    # This includes rows that were successfully created or updated
-    # @return [Array<Row>] All valid rows
-    sig { returns(T::Array[Row]) }
-    def valid_rows
-      created_rows + updated_rows
     end
 
     # Get all rows that failed to be imported

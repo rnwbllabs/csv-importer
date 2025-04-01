@@ -56,15 +56,13 @@ module CSVImporter
         d.to == attribute || d.name == attribute
       end
 
-      if definition
+      definition&.then do
         # Find the column name and convert it to a string before and after
         found_name = column_names.find do |name|
           # Convert to string for matching
           definition.match?(name.to_s)
         end
-        found_name ? found_name.to_s : nil
-      else
-        nil
+        found_name&.to_s
       end
     end
 

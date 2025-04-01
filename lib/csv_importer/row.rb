@@ -1,8 +1,8 @@
 # typed: strict
 # frozen_string_literal: true
 
-require 'csv'
-require 'ostruct'
+require "csv"
+require "ostruct"
 
 module CSVImporter
   # A Row from the CSV file.
@@ -123,16 +123,16 @@ module CSVImporter
       @identifiers = T.let(identifiers, T.nilable(T.any(T::Array[Symbol], Proc)))
 
       # Determine the mode: legacy single-model or multi-model
-      @legacy_mode = T.let(model_klass != nil, T::Boolean)
+      @legacy_mode = T.let(!model_klass.nil?, T::Boolean)
 
       # If we have a legacy model_klass but no models hash, set up the models hash
       if model_klass && models.empty?
-        models = { _default: model_klass }
+        models = {_default: model_klass}
       end
 
       # If we have legacy identifiers but no model_identifiers hash, set those up
       if identifiers && model_identifiers.empty?
-        model_identifiers = { _default: identifiers }
+        model_identifiers = {_default: identifiers}
       end
 
       @models = T.let(models, T::Hash[Symbol, T.anything])
@@ -377,11 +377,11 @@ module CSVImporter
       end
 
       model
-    rescue StandardError => e
+    rescue => e
       # Add error handling that maintains compatibility with our error approach
       add_error("#{e.class}: #{e.message}",
-               column_name: column.name.to_s,
-               attribute: column_definition.to.is_a?(Symbol) ? column_definition.to : nil)
+        column_name: column.name.to_s,
+        attribute: column_definition.to.is_a?(Symbol) ? column_definition.to : nil)
       model
     end
 
@@ -447,7 +447,7 @@ module CSVImporter
       built_models.each do |key, model|
         next unless model.respond_to?(:errors) && model.errors.any?
 
-        error_msg << "#{key}: #{model.errors.full_messages.join(', ')}"
+        error_msg << "#{key}: #{model.errors.full_messages.join(", ")}"
       end
       error_msg.join("; ")
     end
@@ -497,12 +497,12 @@ module CSVImporter
     sig { params(key: Symbol, klass: T.untyped, temp_model: T.untyped, identifiers_proc: Proc).returns(T.untyped) }
     def find_model_with_proc(key, klass, temp_model, identifiers_proc)
       # Execute the proc with or without model based on arity
-      if identifiers_proc.arity == 1
+      identifier_result = if identifiers_proc.arity == 1
         # Execute the proc with the model to get the identifier values
-        identifier_result = T.unsafe(self).instance_exec(temp_model, &identifiers_proc)
+        T.unsafe(self).instance_exec(temp_model, &identifiers_proc)
       else
         # Execute the proc without arguments
-        identifier_result = T.unsafe(self).instance_exec(&identifiers_proc)
+        T.unsafe(self).instance_exec(&identifiers_proc)
       end
 
       return nil unless identifier_result
@@ -698,27 +698,33 @@ module CSVImporter
       end
 
       # Check for errors on all models
-      built_models.each do |key, model|
-        # Check if the model responds to errors and if it has any
-        if model.respond_to?(:errors) && model.errors.any?
-          @valid = false
-          skip! if skip_on_error
-          return
-        end
-
-        # For ActiveModel objects, trigger validations
-        if model.respond_to?(:valid?)
-          valid_result = model.valid?
-          if !valid_result
-            @valid = false
-            skip! if skip_on_error
-            return
-          end
-        end
+      if models_have_errors?
+        @valid = false
+        skip! if skip_on_error
+        return
       end
 
       # If we got here, everything is valid
       @valid = true
+    end
+
+    # Helper method to check if any models have errors
+    # @return [Boolean] true if any model has errors
+    sig { returns(T::Boolean) }
+    def models_have_errors?
+      built_models.any? do |key, model|
+        # Check if the model responds to errors and if it has any
+        if model.respond_to?(:errors) && model.errors.any?
+          return true
+        end
+
+        # For ActiveModel objects, trigger validations
+        if model.respond_to?(:valid?)
+          !model.valid?
+        else
+          false
+        end
+      end
     end
 
     private
@@ -803,8 +809,8 @@ module CSVImporter
           # If we get a NoMethodError (likely due to a nil value),
           # return a default identifier like :email
           add_error("Error in identifier proc: #{e.message}",
-                   column_name: "_general",
-                   skip_row: true)
+            column_name: "_general",
+            skip_row: true)
           [:email] # Default to email as a last resort
         end
       else

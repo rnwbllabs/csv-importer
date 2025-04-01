@@ -350,7 +350,7 @@ mark-new@example.com,false,mark,new_last_name"
       import.run!
 
       # Check which user was found
-      user = User.find_by(email: "mark-new@example.com")
+      User.find_by(email: "mark-new@example.com")
 
       expect(import.report.updated_rows.size).to eq(1)
 
@@ -521,7 +521,6 @@ bob@example.com,true,,
 mark@example.com,false,mark," # missing first names
 
       import = ImportUserCSVByFirstName.new(content: csv_content)
-
 
       expect { import.run! }.to_not raise_error
 

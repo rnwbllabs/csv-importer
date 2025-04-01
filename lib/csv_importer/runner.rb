@@ -99,7 +99,7 @@ module CSVImporter
       begin
         persist_rows!
         report.done!
-      rescue ImportAborted => e
+      rescue ImportAborted
         # The invalid row should already be added by process_row before the exception was raised
         report.aborted!
       end
@@ -314,18 +314,16 @@ module CSVImporter
         was_persisted = false
         if row.instance_variable_defined?(:@_was_persisted)
           was_persisted = row.instance_variable_get(:@_was_persisted)
-        else
+        elsif row.legacy_mode?
           # Try to determine from the current state of the model
-          if row.legacy_mode?
-            model = row.model
-            was_persisted = model.respond_to?(:persisted?) && model.persisted? if model
-          else
-            # For multi-model case, check the primary model
-            order = row.models_in_order
-            if !order.empty? && row.built_models.key?(order.first)
-              primary_model = row.built_models[order.first]
-              was_persisted = primary_model.respond_to?(:persisted?) && primary_model.persisted?
-            end
+          model = row.model
+          was_persisted = model.respond_to?(:persisted?) && model.persisted? if model
+        else
+          # For multi-model case, check the primary model
+          order = row.models_in_order
+          if !order.empty? && row.built_models.key?(order.first)
+            primary_model = row.built_models[order.first]
+            was_persisted = primary_model.respond_to?(:persisted?) && primary_model.persisted?
           end
         end
 
@@ -440,20 +438,18 @@ module CSVImporter
       # If we found a class, use it for the transaction
       if transaction_class
         transaction_class.transaction(&block)
-      else
+      elsif !first_row.built_models.empty?
         # Fallback to built_models if available
-        if !first_row.built_models.empty?
-          first_model = first_row.built_models.values.first
-          if first_model && first_model.class.respond_to?(:transaction)
-            first_model.class.transaction(&block)
-          else
-            # Last resort - just execute the block without a transaction
-            yield
-          end
+        first_model = first_row.built_models.values.first
+        if first_model && first_model.class.respond_to?(:transaction)
+          first_model.class.transaction(&block)
         else
           # Last resort - just execute the block without a transaction
           yield
         end
+      else
+        # Last resort - just execute the block without a transaction
+        yield
       end
     end
   end
