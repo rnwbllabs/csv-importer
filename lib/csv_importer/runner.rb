@@ -96,22 +96,14 @@ module CSVImporter
 
       report.in_progress!
 
-      puts "DEBUG: Runner#call - Initial report.invalid_rows.size: #{report.invalid_rows.size}"
-
       begin
         persist_rows!
-        puts "DEBUG: Runner#call - After persist_rows! report.invalid_rows.size: #{report.invalid_rows.size}"
         report.done!
       rescue ImportAborted => e
-        puts "DEBUG: ImportAborted exception caught in call method"
-        puts "DEBUG: Before aborted! report.invalid_rows.size: #{report.invalid_rows.size}"
-
         # The invalid row should already be added by process_row before the exception was raised
         report.aborted!
-        puts "DEBUG: After aborted! report.invalid_rows.size: #{report.invalid_rows.size}"
       end
 
-      puts "DEBUG: Returning report with status=#{report.status}, invalid_rows=#{report.invalid_rows.size}"
       report
     end
 
@@ -150,7 +142,6 @@ module CSVImporter
       if !row.valid?
         # Add to the invalid_rows collection
         report.add_invalid_row(row)
-        puts "DEBUG: Added row #{row.line_number} to invalid_rows collection"
 
         # Determine if model was persisted before validation
         was_persisted = false
@@ -177,11 +168,6 @@ module CSVImporter
 
         # For abort mode, raise ImportAborted exception after finding the first invalid row
         if abort_when_invalid?
-          # Debug validation and abort condition
-          puts "DEBUG: Row validation failed, row_number=#{row.line_number}"
-          puts "DEBUG: when_invalid=#{when_invalid}, abort_condition=#{abort_when_invalid?}"
-          puts "DEBUG: Raising ImportAborted exception"
-
           # This will abort the transaction and trigger the rescue handler
           raise ImportAborted.new("Import aborted due to invalid row", row)
         end

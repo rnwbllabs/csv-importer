@@ -428,23 +428,12 @@ module CSVImporter
     # @return [Boolean] true if the row is valid
     sig { returns(T::Boolean) }
     def valid?
-      puts "DEBUG: Row#valid? called for row #{line_number}"
       return true if skip?
 
       # Only run validation once if not already done
       unless @validation_run
-        puts "DEBUG: Running validation for row #{line_number}"
         check_errors
         @validation_run = true
-      end
-
-      # For debugging purposes, log errors when invalid
-      if !@valid
-        debug_msg = "Row #{line_number} has errors: #{custom_errors.map { |e| e.message }.join(', ')}"
-        debug_msg += " Models with errors: #{collect_model_error_messages}" if built_models.any? { |_, m| m.respond_to?(:errors) && m.errors.any? }
-        puts debug_msg
-      else
-        puts "DEBUG: Row #{line_number} is valid: #{@valid}"
       end
 
       @valid
@@ -698,25 +687,11 @@ module CSVImporter
       # Nothing to do if already invalid or skipped
       return if !@valid || skip?
 
-      puts "DEBUG: check_errors called for row #{line_number}"
-
       # Build models if necessary
       built_models
 
-      # Log the attributes to see what we're checking
-      puts "DEBUG: CSV attributes: #{csv_attributes.inspect}"
-
-      if legacy_mode?
-        puts "DEBUG: Legacy mode model attributes: #{model.attributes.inspect}"
-      else
-        built_models.each do |key, m|
-          puts "DEBUG: Model #{key} attributes: #{m.respond_to?(:attributes) ? m.attributes.inspect : m.inspect}"
-        end
-      end
-
       # Check for custom errors
       if custom_errors.any?
-        puts "DEBUG: Custom errors found: #{custom_errors.inspect}"
         @valid = false
         skip! if skip_on_error
         return
@@ -726,7 +701,6 @@ module CSVImporter
       built_models.each do |key, model|
         # Check if the model responds to errors and if it has any
         if model.respond_to?(:errors) && model.errors.any?
-          puts "DEBUG: Model errors found on #{key}: #{model.errors.inspect}"
           @valid = false
           skip! if skip_on_error
           return
@@ -735,7 +709,6 @@ module CSVImporter
         # For ActiveModel objects, trigger validations
         if model.respond_to?(:valid?)
           valid_result = model.valid?
-          puts "DEBUG: Model #{key} valid? = #{valid_result}, errors: #{model.errors.inspect}"
           if !valid_result
             @valid = false
             skip! if skip_on_error

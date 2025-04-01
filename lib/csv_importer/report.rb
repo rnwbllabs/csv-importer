@@ -173,7 +173,6 @@ module CSVImporter
     def invalid_rows
       # Include rows that failed to save and any rows in the validation-specific invalid_rows collection
       # that aren't already in failed_to_create_rows or failed_to_update_rows
-      puts "DEBUG: Report#invalid_rows - failed_to_create_rows: #{failed_to_create_rows.size}, failed_to_update_rows: #{failed_to_update_rows.size}, @invalid_rows: #{@invalid_rows.size}"
 
       # Get line numbers from failed rows to avoid double-counting
       failed_line_numbers = (failed_to_create_rows + failed_to_update_rows).map(&:line_number)

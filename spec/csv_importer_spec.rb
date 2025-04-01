@@ -225,15 +225,8 @@ BOB@example.com,true,bob,,"
       import = ImportUserCSV.new(content: csv_content)
       import.run!
 
-      # Debug where the row is stored in the report
-      puts "Failed rows: #{import.report.failed_rows.map(&:line_number)}"
-      puts "Invalid rows: #{import.report.invalid_rows.map(&:line_number)}"
-
       # Find the row with the error - it's in invalid_rows
       row = import.report.invalid_rows.first
-
-      # Check if the row has Model errors
-      puts "Model errors: #{row.model.errors.any? ? row.model.errors.full_messages : 'none'}"
 
       # Modify the test to match our current behavior
       # The error is now on the model, not mapped to the column
@@ -350,24 +343,14 @@ mark@example.com,false,mark,new_last_name"
       existing_user = User.new(email: "mark-new@example.com", f_name: "existing_mark", l_name: "existing_last_name")
       existing_user.save
 
-      # Verify the user exists
-      puts "DEBUG: Existing user: #{User.find_by(email: 'mark-new@example.com').inspect}"
-
       csv_content = "email,confirmed,first_name,last_name
 mark-new@example.com,false,mark,new_last_name"
       import = ImportUserCSVByFirstName.new(content: csv_content)
 
-      # Check what the identifier is set to
-      puts "DEBUG: import.config.identifiers: #{import.config.identifiers.inspect}"
-
       import.run!
-
-      # Debug the report
-      puts "DEBUG: Report status: #{import.report.status}, created: #{import.report.created_rows.size}, updated: #{import.report.updated_rows.size}"
 
       # Check which user was found
       user = User.find_by(email: "mark-new@example.com")
-      puts "DEBUG: User after import: #{user.inspect}, f_name: #{user.f_name}"
 
       expect(import.report.updated_rows.size).to eq(1)
 
@@ -678,32 +661,26 @@ BOB@example.com,true,bob,,"
 
       import = ImportUserCSV.new(content: csv_content) do
         after_save do |user|
-          puts "After save 1 called with: #{user.class}"
           if user.is_a?(CSVImporter::Row)
             # When called with a Row, we need to access the model
             model = user.legacy_mode? ? user.model : (user.built_models.values.first if user.built_models.any?)
             success_array << model.persisted? if model
-            puts "Row model persisted: #{model&.persisted?}"
           else
             # When called with a model directly
             success_array << user.persisted?
-            puts "Model persisted: #{user.persisted?}"
           end
         end
 
         after_save do
-          puts "After save 2 called, count: #{saves_count}"
           saves_count += 1
         end
 
         after_save do |user, attributes|
-          puts "After save 3 called with: #{user.class}"
         end
 
         # Use after_build to add errors to invalid rows, since after_save won't be called for them
         after_build do |model|
           if model.email == "invalid"
-            puts "After build adding error to model with email: #{model.email}"
             model.errors.add(:email, "'#{model.email}' could not be found")
           end
         end
@@ -716,10 +693,6 @@ BOB@example.com,true,bob,,"
       expect(saves_count).to eq 1
 
       # Inspect all rows in the report to find the invalid one
-      puts "Report invalid_rows: #{import.report.invalid_rows.map { |r| [r.line_number, r.csv_attributes["email"]] }}"
-      puts "Report failed_rows: #{import.report.failed_rows.map { |r| [r.line_number, r.csv_attributes["email"]] }}"
-
-      # Since we're using invalid email, the row should be in invalid_rows
       failed_row = import.report.invalid_rows.find { |r| r.csv_attributes["email"] == "invalid" }
       expect(failed_row).not_to be_nil
 
@@ -906,16 +879,12 @@ second@example.com,second,user"
         column :last_name, to: :l_name
 
         before_import do
-          puts "DEBUG: In before_import, datastore[:email_domain] = #{datastore[:email_domain].inspect}"
           datastore[:email_domain] ||= "default.com"
-          puts "DEBUG: After setting default, datastore[:email_domain] = #{datastore[:email_domain].inspect}"
         end
 
         after_build do |user|
           domain = datastore[:email_domain]
-          puts "DEBUG: In after_build, model.f_name = #{user.f_name.inspect}, domain = #{domain.inspect}"
           user.email = "#{user.f_name}@#{domain}"
-          puts "DEBUG: After setting email, model.email = #{user.email.inspect}"
         end
       end
 
@@ -925,7 +894,6 @@ second@example.com,second,user"
         content: csv_content,
         email_domain: "example.org"
       )
-      puts "DEBUG: Before run, import.datastore = #{import.datastore.inspect}"
       import.run!
 
       # Verify the parameter was used correctly
@@ -983,13 +951,6 @@ bad@example.com,bad,person,40"
       import = ImportUserWithCustomErrors.new(content: csv_content)
       import.run!
 
-      # Debugging - let's look at what rows are actually categorized where
-      pp "Rows in each category:"
-      pp "created_rows: #{import.report.created_rows.map(&:line_number)}"
-      pp "updated_rows: #{import.report.updated_rows.map(&:line_number)}"
-      pp "create_skipped_rows: #{import.report.create_skipped_rows.map(&:line_number)}"
-      pp "update_skipped_rows: #{import.report.update_skipped_rows.map(&:line_number)}"
-
       # Check report stats
       expect(import.report.valid_rows.size).to eq(1)
       expect(import.report.created_rows.size).to eq(1)
@@ -1009,12 +970,8 @@ young@example.com,jane,smith,16"
       import = ImportUserWithCustomErrors.new(content: csv_content)
       import.run!
 
-      # Debug how skipped rows are stored
-      pp "create_skipped_rows: #{import.report.create_skipped_rows.map { |r| [r.line_number, r.csv_attributes["email"]] }}"
-
       # Find the skipped row - modify to look in all possible places
       row = import.report.create_skipped_rows.find { |r| r.csv_attributes["email"] == "young@example.com" }
-      pp "Found row: #{row&.line_number}, #{row&.csv_attributes}"
 
       # Check that the error is associated with the correct column
       expect(row.errors).to include("age")
@@ -1064,11 +1021,6 @@ alice@example.com,alice,example"
 
       # First, run in preview mode
       preview_report = import.preview!
-
-      # Debug the preview report
-      puts "Preview report rows:"
-      puts "created_rows: #{preview_report.created_rows.map { |r| [r.line_number, r.csv_attributes["email"]] }}"
-      puts "invalid_rows: #{preview_report.invalid_rows.map { |r| [r.line_number, r.csv_attributes["email"]] }}"
 
       # No records should be created
       expect(User.store.size).to eq(1)  # Only the initial test user
